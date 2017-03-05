@@ -32,11 +32,6 @@ for ARG in "$@"
 do
     # skip non-regular files and option flags
     if [ ! -f "$ARG" ]; then
-        if [ "$ARG" != "-n" ] && [ "$ARG" != "--names" ] \
-        && [ "$ARG" != "-f" ] && [ "$ARG" != "--full-paths" ] \
-        && [ "$ARG" != "-l" ] && [ "$ARG" != "--large" ]; then
-            (>&2 echo "skipping $ARG: not a regular file.")
-        fi
         continue
     fi
 
@@ -49,6 +44,15 @@ for ARG in "$@"
 do
     # skip non-regular files and option flags
     if [ ! -f "$ARG" ]; then
+        if [ "$ARG" != "-n" ] && [ "$ARG" != "--names" ] \
+        && [ "$ARG" != "-f" ] && [ "$ARG" != "--full-paths" ] \
+        && [ "$ARG" != "-l" ] && [ "$ARG" != "--large" ]; then
+            (>&2 echo "skipping $ARG: not a regular file.")
+            # put an extra newline between multiple data URIs
+            if [ $I -gt 0 ] && [ $I -lt $COUNT ]; then
+                (>&2 echo "")
+            fi
+        fi
         continue
     fi
 
@@ -57,6 +61,10 @@ do
         FILESIZE=$(stat -c%s "$ARG")
         if [ $FILESIZE -gt $LIMIT ]; then
             (>&2 echo "skipping $ARG: the file is too big.")
+            # put an extra newline between multiple data URIs
+            if [ $I -gt 0 ] && [ $I -lt $COUNT ]; then
+                (>&2 echo "")
+            fi
             continue
         fi
     fi
@@ -67,9 +75,9 @@ do
     # printf the file name/path
     if $NAMES; then
         if $FULL; then
-            echo "$(tput setaf 1)$ARG$(tput sgr0):"
+            echo "$ARG:"
         else
-            echo $(tput setaf 1)$(basename "$ARG")"$(tput sgr0):"
+            echo $(basename "$ARG")":"
         fi
     fi
 
