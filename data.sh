@@ -9,7 +9,7 @@ LIMIT=500000 # 500 kB
 # options
 NAMES=false # print filenames
 FULL=false # print full paths for filenames
-NOBIG=true # ignore the file limit
+NOBIG=true # abide the file limit
 
 # counters
 COUNT=0
