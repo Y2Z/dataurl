@@ -7,7 +7,7 @@ A cli shell script for generating data URIs out of local files
     sudo cp -n data.sh /usr/bin/dataurl
 
 ## usage
-    data -n picture1.jpg picture2.jpg
+    dataurl -n picture1.jpg picture2.jpg
 
 ## license
 Released into public domain
