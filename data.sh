@@ -1,8 +1,5 @@
 #!/bin/sh
 
-## Written in 2017 by @vflyson
-## Released into public domain
-
 # constants
 LIMIT=500000 # 500 kB
 
