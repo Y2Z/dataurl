@@ -1,10 +1,10 @@
-# data.sh
-A cli shell script for generating data URIs out of local files
+# dataurl.sh
+CLI tool for converting files to data URLs
 
 ![file transfer](https://imgs.xkcd.com/comics/file_transfer.png)
 
 ## Installation
-    sudo cp -n data.sh /usr/bin/dataurl
+    sudo cp -n dataurl.sh /usr/bin/dataurl
 
 ## Usage
     dataurl -n picture1.jpg picture2.jpg
