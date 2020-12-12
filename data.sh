@@ -6,7 +6,7 @@ LIMIT=500000 # 500 KB
 # options
 NAMES=false # print filenames
 FULL=false # print full paths for filenames
-NOBIG=true # abide the file limit
+NOBIG=false # abide the file limit
 
 # counters
 COUNT=0
@@ -19,8 +19,8 @@ do
         NAMES=true
     elif [ "$ARG" = "-f" ] || [ "$ARG" = "--full-paths" ]; then
         FULL=true
-    elif [ "$ARG" = "-l" ] || [ "$ARG" = "--large" ]; then
-        NOBIG=false
+    elif [ "$ARG" = "-l" ] || [ "$ARG" = "--limit" ]; then
+        NOBIG=true
     fi
 done
 
@@ -43,7 +43,7 @@ do
     if [ ! -f "$ARG" ]; then
         if [ "$ARG" != "-n" ] && [ "$ARG" != "--names" ] \
         && [ "$ARG" != "-f" ] && [ "$ARG" != "--full-paths" ] \
-        && [ "$ARG" != "-l" ] && [ "$ARG" != "--large" ]; then
+        && [ "$ARG" != "-l" ] && [ "$ARG" != "--limit" ]; then
             (>&2 echo "skipping $ARG: not a regular file.")
             # put an extra newline between multiple data URIs
             if [ $I -gt 0 ] && [ $I -lt $COUNT ]; then
