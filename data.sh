@@ -1,7 +1,7 @@
 #!/bin/sh
 
 # constants
-LIMIT=500000 # 500 kB
+LIMIT=500000 # 500 KB
 
 # options
 NAMES=false # print filenames
