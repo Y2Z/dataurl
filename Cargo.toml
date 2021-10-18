@@ -1,0 +1,28 @@
+[package]
+name = "dataurl"
+version = "0.0.1"
+authors = [
+    "Sunshine <sunshine@uberspace.net>",
+]
+edition = "2018"
+description = "CLI tool and Rust crate for parsing and generating data URLs"
+homepage = "https://github.com/Y2Z/dataurl"
+repository = "https://github.com/Y2Z/dataurl"
+readme = "README.md"
+keywords = ["web", "command-line"]
+categories = ["base64", "command-line-utilities", "data-url", "web-programming"]
+include = [
+    "src/*.rs",
+    "Cargo.toml",
+]
+license = "CC0-1.0"
+
+[dependencies]
+base64 = "0.13.0"
+clap = "2.33.3"
+encoding_rs = "0.8.29"
+percent-encoding = "2.1.0"
+url = "2.2.2"
+
+[dev-dependencies]
+assert_cmd = "2.0.2"
