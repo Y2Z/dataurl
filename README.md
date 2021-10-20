@@ -24,7 +24,6 @@ sudo install -b dist/run-in-container.sh /usr/local/bin/dataurl
 ```
 
 #### From source
-
 ```console
 git clone https://github.com/Y2Z/dataurl.git
 cd dataurl
@@ -58,29 +57,28 @@ assert_eq!(data_url.to_string(), "data:,Hello,%20World!");
 
 ## Usage (CLI)
 ```console
-    dataurl -i picture.png
+dataurl -i picture.png
 ```
-or
 ```console
-    dataurl data:text/html,base64;Bz...== > index.html
+cat file.txt | dataurl -i -
 ```
-or
 ```console
-    cat file.txt | dataurl -i -
-
+cat file.png | dataurl
 ```
-
+```console
+dataurl -d 'data:text/html,lots of text...<p><a name%3D"bottom">bottom</a>?arg=val#something' > index.html
+```
 
 ---------------------------------------------------
 
 
 ## Options
- - `-b`: Prefer encoding into base64 even when not necessary
- - `-c`: Use custom `charset` (automatically sets `-b`)
- - `-d`: Decode input, save/output resulting blob
- - `-f`: Specify custom `fragment` to append
- - `-i`: Specify custom `file` to obtain input from (use `-` for STDIN)
- - `-t`: Specify media type for the data URL to be generated with
+ - `-b`: Prefer to use base64 even when not necessary
+ - `-c`: Use custom `charset` (automatically sets `-b` if not `US-ASCII` or `windows-1252`)
+ - `-d`: Attempt to parse input as data URL and output resulting data
+ - `-f`: Append custom `fragment`
+ - `-i`: Path to `file` to read input from (use `-` for STDIN)
+ - `-t`: Specify custom media type
 
 
 ---------------------------------------------------
