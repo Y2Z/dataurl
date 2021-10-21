@@ -96,9 +96,9 @@ mod passing {
 
         assert_eq!(data_url.media_type(), "text/css".to_string());
         assert_eq!(data_url.charset(), "UTF-8".to_string());
-        assert!(data_url.encoded());
+        assert!(data_url.base64_encoded());
         assert_eq!(data_url.data(), [195, 156]);
-        assert_eq!(String::from_utf8_lossy(data_url.data()), "Ü");
+        assert_eq!(data_url.text(), "Ü");
         assert_eq!(data_url.fragment(), None);
 
         Ok(())
@@ -107,17 +107,51 @@ mod passing {
     #[test]
     fn must_parse_unicode_emoji_if_has_extra_meta_data() -> Result<(), DataUrlParseError> {
         let data_url: DataUrl =
-            DataUrl::parse("data:TEXT/css;filename=x;charset=Utf-8;BASE64;somethingelse,w5w=")?;
+            DataUrl::parse("data:TEXT/CSS;filename=x.css;charset=Utf-8;BASE64;somethingelse,w5w=")?;
 
         assert_eq!(data_url.media_type(), "text/css".to_string());
         assert_eq!(data_url.charset(), "UTF-8".to_string());
-        assert!(data_url.encoded());
+        assert!(data_url.base64_encoded());
         assert_eq!(data_url.data(), [195, 156]);
-        assert_eq!(String::from_utf8_lossy(data_url.data()), "Ü");
+        assert_eq!(data_url.text(), "Ü");
         assert_eq!(data_url.fragment(), None);
 
         Ok(())
     }
+
+    #[test]
+    fn must_parse_unicode_emoji_if_has_extra_meta_data_and_multiple_charsets(
+    ) -> Result<(), DataUrlParseError> {
+        let data_url: DataUrl = DataUrl::parse(
+            "data:TEXT/CSS;charset=Utf-8;filename=x;charset=US-ASCII;BASE64;somethingelse,w5w=",
+        )?;
+
+        assert_eq!(data_url.media_type(), "text/css".to_string());
+        assert_eq!(data_url.charset(), "UTF-8".to_string());
+        assert!(data_url.base64_encoded());
+        assert_eq!(data_url.data(), [195, 156]);
+        assert_eq!(data_url.text(), "Ü");
+        assert_eq!(data_url.fragment(), None);
+
+        Ok(())
+    }
+
+    // #[test]
+    // fn must_parse_unicode_emoji_if_has_extra_meta_data_and_multiple_charsets_with_spaces(
+    // ) -> Result<(), DataUrlParseError> {
+    //     let data_url: DataUrl = DataUrl::parse(
+    //         "data:TEXT/CSS; charset=Utf-8; filename=x; charset = US-ASCII; BASE64; somethingelse ,w5w=",
+    //     )?;
+
+    //     assert_eq!(data_url.media_type(), "text/css".to_string());
+    //     assert_eq!(data_url.charset(), "UTF-8".to_string());
+    //     assert!(data_url.encoded());
+    //     assert_eq!(data_url.data(), [195, 156]);
+    //     assert_eq!(data_url.text(), "Ü");
+    //     assert_eq!(data_url.fragment(), None);
+
+    //     Ok(())
+    // }
 }
 
 //  ███████╗ █████╗ ██╗██╗     ██╗███╗   ██╗ ██████╗
@@ -146,13 +180,13 @@ mod failing {
     }
 
     #[test]
-    fn must_treat_data_as_unencoded_if_no_semicolon_before_base64() -> Result<(), DataUrlParseError>
-    {
+    fn must_treat_data_as_base64_unencoded_if_no_semicolon_before_base64(
+    ) -> Result<(), DataUrlParseError> {
         let data_url: DataUrl = DataUrl::parse("data:base64,SGVsbG8sIHdvcmxkIQo=")?;
 
         assert_eq!(data_url.media_type(), "text/plain".to_string());
         assert_eq!(data_url.charset(), "US-ASCII".to_string());
-        assert!(!data_url.encoded());
+        assert!(!data_url.base64_encoded());
         assert_eq!(
             String::from_utf8_lossy(data_url.data()),
             "SGVsbG8sIHdvcmxkIQo="
@@ -168,7 +202,7 @@ mod failing {
 
         assert_eq!(data_url.media_type(), "text/plain".to_string());
         assert_eq!(data_url.charset(), "US-ASCII".to_string());
-        assert!(data_url.encoded());
+        assert!(data_url.base64_encoded());
         assert_eq!(data_url.data(), []);
         assert_eq!(data_url.fragment(), None);
 
@@ -181,7 +215,7 @@ mod failing {
 
         assert_eq!(data_url.media_type(), "text/plain".to_string());
         assert_eq!(data_url.charset(), "US-ASCII".to_string());
-        assert!(!data_url.encoded());
+        assert!(!data_url.base64_encoded());
         assert_eq!(data_url.data(), []);
         assert_eq!(data_url.fragment(), None);
 
@@ -195,7 +229,7 @@ mod failing {
 
         assert_eq!(data_url.media_type(), "text/css".to_string());
         assert_eq!(data_url.charset(), "US-ASCII".to_string());
-        assert!(data_url.encoded());
+        assert!(data_url.base64_encoded());
         assert_eq!(data_url.data(), [195, 156]);
         assert_eq!(data_url.fragment(), None);
         assert_eq!(data_url.text(), "Ãœ");

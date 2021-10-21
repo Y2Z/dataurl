@@ -52,10 +52,11 @@ assert_eq!(data_url.media_type(), "text/plain".to_string());
 assert_eq!(data_url.media_type_no_default(), None);
 assert_eq!(data_url.charset(), "US-ASCII".to_string());
 assert_eq!(data_url.charset_no_default(), None);
-assert!(!data_url.encoded());
-assert_eq!(String::from_utf8_lossy(data_url.data()), "Hello, World!");
+assert!(!data_url.base64_encoded());
+assert_eq!(data_url.data(), [72, 101, 108, 108, 111, 44, 32, 87, 111, 114, 108, 100, 33]);
 assert_eq!(data_url.fragment(), None);
-assert_eq!(data_url.to_string(), "data:,Hello,%20World!");
+assert_eq!(data_url.to_string(), "data:,Hello%2C%20World%21");
+assert_eq!(data_url.text(), "Hello, World!");
 ```
 
 
@@ -69,7 +70,7 @@ dataurl "some text"
 ```
 
 ```console
-dataurl -d 'data:text/html,text...<p><a name%3D"bottom">bottom</a>?arg=val#something' > index.html
+dataurl -d 'data:text/html,text...<p><a name%3D"bottom">bottom</a>?arg=val#f' > index.html
 ```
 
 ```console
@@ -91,10 +92,10 @@ cat file.png | dataurl
 
  - `-b`: Prefer to use base64 even when not necessary
  - `-c`: Use custom `charset` (automatically sets `-b` if not `US-ASCII` or `windows-1252`)
- - `-d`: Attempt to parse input and output resulting data
+ - `-d`: Attempt to parse input, output resulting data
  - `-f`: Append custom `fragment`
- - `-i`: Path to `file` to read input from (use `-` for STDIN)
- - `-t`: Specify custom `media type`
+ - `-i`: Path to `file` to treat as input (use `-` for STDIN)
+ - `-t`: Adjust `media type`
 
 
 ---------------------------------------------------

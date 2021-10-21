@@ -9,7 +9,7 @@ const DEFAULT_CHARSET: &'static str = "US-ASCII";
 pub struct DataUrl {
     media_type: Option<String>, // Mime type
     charset: Option<String>,    // US-ASCII is default, according to the spec
-    encoded: bool,              // Indicates if it's a base64-encoded data URL
+    base64_encoded: bool,       // Indicates if it's a base64-encoded data URL
     data: Vec<u8>,              // Data, bytes
     fragment: Option<String>,   // #something-at-the-end, None by default
 }
@@ -26,10 +26,15 @@ impl fmt::Debug for DataUrlParseError {
     }
 }
 
+fn validate_media_type(input: &str) -> bool {
+    // Must contain one slash
+    input.split('/').collect::<Vec<&str>>().len() == 2
+}
+
 fn parse_data_url_meta_data(meta_data_string: String) -> (Option<String>, Option<String>, bool) {
     let mut media_type: Option<String> = None;
     let mut charset: Option<String> = None;
-    let mut encoded: bool = false;
+    let mut base64_encoded: bool = false;
 
     // Parse meta data
     let content_type_items: Vec<&str> = meta_data_string.split(';').collect();
@@ -37,23 +42,26 @@ fn parse_data_url_meta_data(meta_data_string: String) -> (Option<String>, Option
     for item in &content_type_items {
         if i == 0 {
             // TODO: properly validte media type
-            if item.trim().len() > 0 && item.contains("/") {
+            if item.trim().len() > 0 && validate_media_type(item) {
                 media_type = Some(item.trim().to_lowercase().to_string());
             }
         } else {
-            if !encoded && item.trim().to_lowercase().starts_with("charset=") {
-                if let Some(e) = Encoding::for_label_no_replacement((&item[8..]).as_bytes()) {
-                    charset = Some(e.name().to_string());
+            if !base64_encoded && item.trim().to_lowercase().starts_with("charset=") {
+                // only the first occurence of charset counts
+                if charset.is_none() {
+                    if let Some(e) = Encoding::for_label_no_replacement((&item[8..]).as_bytes()) {
+                        charset = Some(e.name().to_string());
+                    }
                 }
             } else if item.trim().eq_ignore_ascii_case("base64") {
-                encoded = true;
+                base64_encoded = true;
             }
         }
 
         i += 1;
     }
 
-    (media_type, charset, encoded)
+    (media_type, charset, base64_encoded)
 }
 
 impl DataUrl {
@@ -61,7 +69,7 @@ impl DataUrl {
         DataUrl {
             media_type: None,
             charset: None,
-            encoded: false,
+            base64_encoded: false,
             data: [].to_vec(),
             fragment: None,
         }
@@ -76,7 +84,8 @@ impl DataUrl {
 
                     // Parse meta data
                     let meta_data_string = String::from(&path[..comma_offset]);
-                    let (media_type, charset, encoded) = parse_data_url_meta_data(meta_data_string);
+                    let (media_type, charset, base64_encoded) =
+                        parse_data_url_meta_data(meta_data_string);
 
                     // Parse raw data into vector of bytes
                     let mut data_string: String = percent_decode_str(&path[comma_offset + 1..])
@@ -87,7 +96,7 @@ impl DataUrl {
                         data_string += &percent_decode_str(&query).decode_utf8_lossy().to_string();
                     }
                     let mut unable_to_decode_base64: bool = false;
-                    let blob: Vec<u8> = if encoded {
+                    let blob: Vec<u8> = if base64_encoded {
                         match base64::decode(&data_string) {
                             Ok(decoded) => decoded,
                             Err(_) => {
@@ -106,7 +115,7 @@ impl DataUrl {
                     Ok(DataUrl {
                         media_type: media_type,
                         charset: charset,
-                        encoded: encoded,
+                        base64_encoded: base64_encoded,
                         data: blob,
                         fragment: if let Some(f) = fragment {
                             Some(f.to_string())
@@ -122,6 +131,7 @@ impl DataUrl {
         }
     }
 
+    // TODO: make it a promise, throw error in case base64_encoded=false, and charset!=default|utf8
     pub fn to_string(&self) -> String {
         let mut result: String = "data:".to_string();
 
@@ -137,7 +147,7 @@ impl DataUrl {
             }
         }
 
-        if self.encoded {
+        if self.base64_encoded {
             result += ";base64,";
             if self.data.len() > 0 {
                 // This can never fail
@@ -227,12 +237,12 @@ impl DataUrl {
         }
     }
 
-    pub fn encoded(&self) -> bool {
-        self.encoded
+    pub fn base64_encoded(&self) -> bool {
+        self.base64_encoded
     }
 
-    pub fn set_encoded(&mut self, new_encoded: bool) {
-        self.encoded = new_encoded;
+    pub fn set_base64_encoded(&mut self, new_base64_encoded: bool) {
+        self.base64_encoded = new_base64_encoded;
     }
 
     pub fn data(&self) -> &[u8] {

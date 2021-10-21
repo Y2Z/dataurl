@@ -22,7 +22,7 @@ mod passing {
     fn must_be_empty_with_base64_if_set_encoded_to_true() -> Result<(), DataUrlParseError> {
         let mut data_url = DataUrl::new();
 
-        data_url.set_encoded(true);
+        data_url.set_base64_encoded(true);
 
         assert_eq!(data_url.to_string(), "data:;base64,");
 
@@ -35,7 +35,7 @@ mod passing {
         let mut data_url = DataUrl::new();
 
         data_url.set_media_type(Some("text/html".to_string()));
-        data_url.set_encoded(true);
+        data_url.set_base64_encoded(true);
 
         assert_eq!(data_url.to_string(), "data:text/html;base64,");
 
@@ -48,7 +48,7 @@ mod passing {
 
         data_url.set_media_type(Some("text/html".to_string()));
         data_url.set_charset(Some("US-ASCII".to_string()));
-        data_url.set_encoded(true);
+        data_url.set_base64_encoded(true);
 
         assert_eq!(data_url.to_string(), "data:text/html;base64,");
 
@@ -61,7 +61,7 @@ mod passing {
 
         data_url.set_media_type(Some("text/html".to_string()));
         data_url.set_charset(Some("utf8".to_string()));
-        data_url.set_encoded(true);
+        data_url.set_base64_encoded(true);
 
         assert_eq!(data_url.to_string(), "data:text/html;charset=UTF-8;base64,");
 
@@ -74,7 +74,7 @@ mod passing {
 
         data_url.set_media_type(Some("text/html".to_string()));
         data_url.set_charset(Some("utf8".to_string()));
-        data_url.set_encoded(true);
+        data_url.set_base64_encoded(true);
         data_url.set_data(&[0xe2, 0x98, 0x80, 0xef, 0xb8, 0x8f]); // Sun emoji in UTF-8 bytes
 
         assert_eq!(
@@ -120,7 +120,7 @@ mod failing {
         data_url.set_media_type(Some("text/html".to_string()));
         data_url.set_charset(Some("utf8".to_string())); // This must set charset to UTF-8
         data_url.set_charset(Some("BAD-CHARSET".to_string())); // And this bad input must make it fall back to US-ASCII
-        data_url.set_encoded(true);
+        data_url.set_base64_encoded(true);
 
         assert_eq!(data_url.to_string(), "data:text/html;base64,");
 
