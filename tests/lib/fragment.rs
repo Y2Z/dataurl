@@ -10,52 +10,82 @@ mod passing {
     use dataurl::{DataUrl, DataUrlParseError};
 
     #[test]
-    fn default_and_set_fragment() -> Result<(), DataUrlParseError> {
-        let mut data_url = DataUrl::new();
+    fn must_be_none_by_default() -> Result<(), DataUrlParseError> {
+        let data_url = DataUrl::new();
 
-        // Should be none by default
         assert_eq!(data_url.fragment(), None);
         assert_eq!(data_url.to_string(), "data:,");
 
-        // Shown as defined but empty is set to an empty string
+        Ok(())
+    }
+
+    #[test]
+    fn must_be_rendered_as_pound_sign_if_set_to_an_empty_string() -> Result<(), DataUrlParseError> {
+        let mut data_url = DataUrl::new();
+
         data_url.set_fragment(Some("".to_string()));
+
         assert_eq!(data_url.fragment(), Some("".to_string()));
         assert_eq!(data_url.to_string(), "data:,#");
 
-        // Should be possible te unset it
+        Ok(())
+    }
+
+    #[test]
+    fn must_parse_empty_string_if_just_pound_sign_given() -> Result<(), DataUrlParseError> {
+        let data_url = DataUrl::parse("data:,#")?;
+
+        assert_eq!(data_url.fragment(), Some("".to_string()));
+
+        Ok(())
+    }
+
+    #[test]
+    fn must_be_possible_to_unset() -> Result<(), DataUrlParseError> {
+        let mut data_url = DataUrl::parse("data:,#something")?;
+
+        assert_eq!(data_url.fragment(), Some("something".to_string()));
+
         data_url.set_fragment(None);
+
         assert_eq!(data_url.fragment(), None);
 
-        // Should be possible to set it to a string
+        Ok(())
+    }
+
+    #[test]
+
+    fn must_be_possible_to_set() -> Result<(), DataUrlParseError> {
+        let mut data_url = DataUrl::new();
+
         data_url.set_fragment(Some("something".to_string()));
+
         assert_eq!(data_url.fragment(), Some("something".to_string()));
         assert_eq!(data_url.to_string(), "data:,#something");
 
-        // Should be possible to set it to a whitespace
+        Ok(())
+    }
+
+    #[test]
+    fn must_be_possible_to_set_it_to_a_whitespace() -> Result<(), DataUrlParseError> {
+        let mut data_url = DataUrl::new();
+
         data_url.set_fragment(Some(" ".to_string()));
+
         assert_eq!(data_url.fragment(), Some(" ".to_string()));
         assert_eq!(data_url.to_string(), "data:,#%20");
 
         Ok(())
     }
-}
-
-//  ███████╗ █████╗ ██╗██╗     ██╗███╗   ██╗ ██████╗
-//  ██╔════╝██╔══██╗██║██║     ██║████╗  ██║██╔════╝
-//  █████╗  ███████║██║██║     ██║██╔██╗ ██║██║  ███╗
-//  ██╔══╝  ██╔══██║██║██║     ██║██║╚██╗██║██║   ██║
-//  ██║     ██║  ██║██║███████╗██║██║ ╚████║╚██████╔╝
-//  ╚═╝     ╚═╝  ╚═╝╚═╝╚══════╝╚═╝╚═╝  ╚═══╝ ╚═════╝
-
-#[cfg(test)]
-mod failing {
-    use dataurl::{DataUrl, DataUrlParseError};
 
     #[test]
-    fn fallback_to_default_if_bad() -> Result<(), DataUrlParseError> {
+    fn must_remain_abset_if_given_none() -> Result<(), DataUrlParseError> {
         let mut data_url = DataUrl::new();
-        data_url.set_charset(Some("BAD-CHARSET".to_string())); // This bad input must make it fall back to US-ASCII
-        assert_eq!(data_url.charset(), "US-ASCII");
+
+        data_url.set_fragment(None);
+
+        assert_eq!(data_url.fragment(), None);
+
         Ok(())
     }
 }
