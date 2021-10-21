@@ -240,9 +240,20 @@ impl DataUrl {
         &self.data
     }
 
-    // TODO
-    // pub fn text(&self) -> String {
-    // }
+    pub fn text(&self) -> String {
+        // This can never really fail
+        if let Some(encoding) = Encoding::for_label(
+            self.charset
+                .as_ref()
+                .unwrap_or(&DEFAULT_CHARSET.to_string())
+                .as_bytes(),
+        ) {
+            let (decoded, _, _) = encoding.decode(&self.data);
+            decoded.to_string()
+        } else {
+            "".to_string()
+        }
+    }
 
     // TODO
     // pub fn set_text(&self, Option<String>) {
