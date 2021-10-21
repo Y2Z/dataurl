@@ -5,4 +5,5 @@ mod media_type;
 mod media_type_no_default;
 mod new;
 mod parse;
+mod text;
 mod to_string;

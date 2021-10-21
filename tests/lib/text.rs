@@ -10,21 +10,41 @@ mod passing {
     use dataurl::{DataUrl, DataUrlParseError};
 
     #[test]
-    fn must_be_text_plain_by_default() -> Result<(), DataUrlParseError> {
+    fn must_be_empty_by_default() -> Result<(), DataUrlParseError> {
         let data_url = DataUrl::new();
 
-        assert_eq!(data_url.media_type(), "text/plain");
+        assert_eq!(data_url.text(), "");
 
         Ok(())
     }
 
     #[test]
-    fn must_be_possible_to_set_to_image_png() -> Result<(), DataUrlParseError> {
+    fn must_remain_empty_after_given_empty_data() -> Result<(), DataUrlParseError> {
         let mut data_url = DataUrl::new();
 
-        data_url.set_media_type(Some("image/png".to_string()));
+        data_url.set_data(&[]);
+        assert_eq!(data_url.text(), "");
 
-        assert_eq!(data_url.media_type(), "image/png");
+        Ok(())
+    }
+
+    #[test]
+    fn must_accept_and_return_same_ascii_text() -> Result<(), DataUrlParseError> {
+        let mut data_url = DataUrl::new();
+
+        data_url.set_data(b"some text");
+        assert_eq!(data_url.text(), "some text");
+
+        Ok(())
+    }
+
+    #[test]
+    fn must_accept_and_return_same_utf8_text() -> Result<(), DataUrlParseError> {
+        let mut data_url = DataUrl::new();
+
+        data_url.set_charset(Some("utf8".to_string()));
+        data_url.set_data("Ü".as_bytes());
+        assert_eq!(data_url.text(), "Ü");
 
         Ok(())
     }
@@ -42,36 +62,13 @@ mod failing {
     use dataurl::{DataUrl, DataUrlParseError};
 
     #[test]
-    fn must_fall_back_to_text_plain_if_set_to_empty() -> Result<(), DataUrlParseError> {
-        let mut data_url = DataUrl::new();
-
-        data_url.set_media_type(Some("".to_string()));
-
-        assert_eq!(data_url.media_type(), "text/plain");
-
-        Ok(())
-    }
-
-    #[test]
-    fn must_fall_back_to_text_plain_if_attempted_to_set_to_whitespace(
+    fn must_return_garbage_when_given_unicode_data_without_setting_charset_to_utf8(
     ) -> Result<(), DataUrlParseError> {
         let mut data_url = DataUrl::new();
 
-        data_url.set_media_type(Some(" ".to_string()));
-
-        assert_eq!(data_url.media_type(), "text/plain");
+        data_url.set_data("Ü".as_bytes());
+        assert_eq!(data_url.text(), "Ãœ");
 
         Ok(())
     }
-
-    // #[test]
-    // fn must_fall_back_to_text_plain_if_attempted_to_set_to_bad() -> Result<(), DataUrlParseError> {
-    //     let mut data_url = DataUrl::new();
-
-    //     data_url.set_media_type(Some("bad".to_string()));
-
-    //     assert_eq!(data_url.media_type(), "text/plain");
-
-    //     Ok(())
-    // }
 }
