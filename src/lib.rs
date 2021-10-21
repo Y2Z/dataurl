@@ -3,8 +3,8 @@ use percent_encoding::{percent_decode_str, utf8_percent_encode, NON_ALPHANUMERIC
 use std::fmt;
 use url::Url;
 
-pub const DEFAULT_MEDIA_TYPE: &'static str = "text/plain";
-pub const DEFAULT_CHARSET: &'static str = "US-ASCII";
+const DEFAULT_MEDIA_TYPE: &'static str = "text/plain";
+const DEFAULT_CHARSET: &'static str = "US-ASCII";
 
 pub struct DataUrl {
     media_type: Option<String>, // Mime type
@@ -26,9 +26,7 @@ impl fmt::Debug for DataUrlParseError {
     }
 }
 
-pub fn parse_data_url_meta_data(
-    meta_data_string: String,
-) -> (Option<String>, Option<String>, bool) {
+fn parse_data_url_meta_data(meta_data_string: String) -> (Option<String>, Option<String>, bool) {
     let mut media_type: Option<String> = None;
     let mut charset: Option<String> = None;
     let mut encoded: bool = false;
@@ -38,16 +36,17 @@ pub fn parse_data_url_meta_data(
     let mut i: i8 = 0;
     for item in &content_type_items {
         if i == 0 {
+            // TODO: properly validte media type
             if item.trim().len() > 0 && item.contains("/") {
-                media_type = Some(item.trim().to_string());
+                media_type = Some(item.trim().to_lowercase().to_string());
             }
         } else {
-            if item.trim().eq_ignore_ascii_case("base64") {
-                encoded = true;
-            } else if item.trim().starts_with("charset=") {
+            if !encoded && item.trim().to_lowercase().starts_with("charset=") {
                 if let Some(e) = Encoding::for_label_no_replacement((&item[8..]).as_bytes()) {
                     charset = Some(e.name().to_string());
                 }
+            } else if item.trim().eq_ignore_ascii_case("base64") {
+                encoded = true;
             }
         }
 

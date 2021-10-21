@@ -89,6 +89,35 @@ mod passing {
 
         Ok(())
     }
+
+    #[test]
+    fn must_parse_all_caps() -> Result<(), DataUrlParseError> {
+        let data_url: DataUrl = DataUrl::parse("data:TEXT/CSS;CHARSET=UTF8;BASE64,w5w=")?;
+
+        assert_eq!(data_url.media_type(), "text/css".to_string());
+        assert_eq!(data_url.charset(), "UTF-8".to_string());
+        assert!(data_url.encoded());
+        assert_eq!(data_url.data(), [195, 156]);
+        assert_eq!(String::from_utf8_lossy(data_url.data()), "Ü");
+        assert_eq!(data_url.fragment(), None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn must_parse_unicode_emoji_if_has_extra_meta_data() -> Result<(), DataUrlParseError> {
+        let data_url: DataUrl =
+            DataUrl::parse("data:TEXT/css;filename=x;charset=Utf-8;BASE64;somethingelse,w5w=")?;
+
+        assert_eq!(data_url.media_type(), "text/css".to_string());
+        assert_eq!(data_url.charset(), "UTF-8".to_string());
+        assert!(data_url.encoded());
+        assert_eq!(data_url.data(), [195, 156]);
+        assert_eq!(String::from_utf8_lossy(data_url.data()), "Ü");
+        assert_eq!(data_url.fragment(), None);
+
+        Ok(())
+    }
 }
 
 //  ███████╗ █████╗ ██╗██╗     ██╗███╗   ██╗ ██████╗
@@ -155,6 +184,29 @@ mod failing {
         assert!(!data_url.encoded());
         assert_eq!(data_url.data(), []);
         assert_eq!(data_url.fragment(), None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn must_fall_to_parse_charset_if_put_not_right_after_media_type(
+    ) -> Result<(), DataUrlParseError> {
+        let mut data_url: DataUrl = DataUrl::parse("data:text/css;base64;charset=utf8,w5w=")?;
+
+        assert_eq!(data_url.media_type(), "text/css".to_string());
+        assert_eq!(data_url.charset(), "US-ASCII".to_string());
+        assert!(data_url.encoded());
+        assert_eq!(data_url.data(), [195, 156]);
+        assert_eq!(data_url.fragment(), None);
+        assert_eq!(data_url.text(), "Ãœ");
+        // Different from the original her because we needed to encode "Ãœ" as US-ASCII, which is 4 bytes
+        assert_eq!(data_url.to_string(), "data:text/css;base64,w4PFkw==");
+        data_url.set_charset(Some("utf-8".to_string()));
+        // And now it should be fine
+        assert_eq!(
+            data_url.to_string(),
+            "data:text/css;charset=UTF-8;base64,w5w="
+        );
 
         Ok(())
     }
