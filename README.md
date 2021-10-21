@@ -103,6 +103,7 @@ cat file.png | dataurl
 ## References
 
  - https://datatracker.ietf.org/doc/html/rfc2397
+ - https://datatracker.ietf.org/doc/html/rfc6838
 
 
 ---------------------------------------------------

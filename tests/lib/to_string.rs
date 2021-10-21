@@ -84,6 +84,22 @@ mod passing {
 
         Ok(())
     }
+
+    #[test]
+    fn must_properly_encode_utf8_emoji() -> Result<(), DataUrlParseError> {
+        let mut data_url = DataUrl::new();
+
+        data_url.set_media_type(Some("text/html".to_string()));
+        data_url.set_charset(Some("utf8".to_string()));
+        data_url.set_data(&[0xe2, 0x98, 0x80, 0xef, 0xb8, 0x8f]); // Sun emoji in UTF-8 bytes
+
+        assert_eq!(
+            data_url.to_string(),
+            "data:text/html;charset=UTF-8,%E2%98%80%EF%B8%8F"
+        );
+
+        Ok(())
+    }
 }
 
 //  ███████╗ █████╗ ██╗██╗     ██╗███╗   ██╗ ██████╗
