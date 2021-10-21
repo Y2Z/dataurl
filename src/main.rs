@@ -88,7 +88,7 @@ fn main() {
         let mut data_url = DataUrl::new();
         data_url.set_data(input.as_bytes());
         if app.is_present("base64") {
-            data_url.set_base64_encoded(true);
+            data_url.set_is_base64_encoded(true);
         }
         if app.is_present("charset") {
             data_url.set_charset(Some(app.value_of("charset").unwrap().to_string()));

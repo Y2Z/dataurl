@@ -9,7 +9,7 @@ const DEFAULT_CHARSET: &'static str = "US-ASCII";
 pub struct DataUrl {
     media_type: Option<String>, // Mime type
     charset: Option<String>,    // US-ASCII is default, according to the spec
-    base64_encoded: bool,       // Indicates if it's a base64-encoded data URL
+    is_base64_encoded: bool,    // Indicates if it's a base64-encoded data URL
     data: Vec<u8>,              // Data, bytes
     fragment: Option<String>,   // #something-at-the-end, None by default
 }
@@ -34,7 +34,7 @@ fn validate_media_type(input: &str) -> bool {
 fn parse_data_url_meta_data(meta_data_string: String) -> (Option<String>, Option<String>, bool) {
     let mut media_type: Option<String> = None;
     let mut charset: Option<String> = None;
-    let mut base64_encoded: bool = false;
+    let mut is_base64_encoded: bool = false;
 
     // Parse meta data
     let content_type_items: Vec<&str> = meta_data_string.split(';').collect();
@@ -46,7 +46,7 @@ fn parse_data_url_meta_data(meta_data_string: String) -> (Option<String>, Option
                 media_type = Some(item.trim().to_lowercase().to_string());
             }
         } else {
-            if !base64_encoded && item.trim().to_lowercase().starts_with("charset=") {
+            if !is_base64_encoded && item.trim().to_lowercase().starts_with("charset=") {
                 // only the first occurence of charset counts
                 if charset.is_none() {
                     if let Some(e) = Encoding::for_label_no_replacement((&item[8..]).as_bytes()) {
@@ -54,14 +54,14 @@ fn parse_data_url_meta_data(meta_data_string: String) -> (Option<String>, Option
                     }
                 }
             } else if item.trim().eq_ignore_ascii_case("base64") {
-                base64_encoded = true;
+                is_base64_encoded = true;
             }
         }
 
         i += 1;
     }
 
-    (media_type, charset, base64_encoded)
+    (media_type, charset, is_base64_encoded)
 }
 
 impl DataUrl {
@@ -69,7 +69,7 @@ impl DataUrl {
         DataUrl {
             media_type: None,
             charset: None,
-            base64_encoded: false,
+            is_base64_encoded: false,
             data: [].to_vec(),
             fragment: None,
         }
@@ -84,7 +84,7 @@ impl DataUrl {
 
                     // Parse meta data
                     let meta_data_string = String::from(&path[..comma_offset]);
-                    let (media_type, charset, base64_encoded) =
+                    let (media_type, charset, is_base64_encoded) =
                         parse_data_url_meta_data(meta_data_string);
 
                     // Parse raw data into vector of bytes
@@ -96,7 +96,7 @@ impl DataUrl {
                         data_string += &percent_decode_str(&query).decode_utf8_lossy().to_string();
                     }
                     let mut unable_to_decode_base64: bool = false;
-                    let blob: Vec<u8> = if base64_encoded {
+                    let blob: Vec<u8> = if is_base64_encoded {
                         match base64::decode(&data_string) {
                             Ok(decoded) => decoded,
                             Err(_) => {
@@ -115,7 +115,7 @@ impl DataUrl {
                     Ok(DataUrl {
                         media_type: media_type,
                         charset: charset,
-                        base64_encoded: base64_encoded,
+                        is_base64_encoded: is_base64_encoded,
                         data: blob,
                         fragment: if let Some(f) = fragment {
                             Some(f.to_string())
@@ -131,7 +131,7 @@ impl DataUrl {
         }
     }
 
-    // TODO: make it a promise, throw error in case base64_encoded=false, and charset!=default|utf8
+    // TODO: make it a promise, throw error in case is_base64_encoded=false, and charset!=default|utf8
     pub fn to_string(&self) -> String {
         let mut result: String = "data:".to_string();
 
@@ -147,7 +147,7 @@ impl DataUrl {
             }
         }
 
-        if self.base64_encoded {
+        if self.is_base64_encoded {
             result += ";base64,";
             if self.data.len() > 0 {
                 // This can never fail
@@ -237,12 +237,12 @@ impl DataUrl {
         }
     }
 
-    pub fn base64_encoded(&self) -> bool {
-        self.base64_encoded
+    pub fn is_base64_encoded(&self) -> bool {
+        self.is_base64_encoded
     }
 
-    pub fn set_base64_encoded(&mut self, new_base64_encoded: bool) {
-        self.base64_encoded = new_base64_encoded;
+    pub fn set_is_base64_encoded(&mut self, new_is_base64_encoded: bool) {
+        self.is_base64_encoded = new_is_base64_encoded;
     }
 
     pub fn data(&self) -> &[u8] {

@@ -22,7 +22,7 @@ mod passing {
     fn must_be_able_to_parse_url_with_no_media_type() -> Result<(), DataUrlParseError> {
         let data_url: DataUrl = DataUrl::parse("data:,Hello,%20World!")?;
 
-        assert_eq!(String::from_utf8_lossy(data_url.data()), "Hello, World!");
+        assert_eq!(data_url.text(), "Hello, World!");
 
         Ok(())
     }
@@ -31,7 +31,7 @@ mod passing {
     fn must_parse_query_as_part_of_data() -> Result<(), DataUrlParseError> {
         let data_url: DataUrl = DataUrl::parse("data:;,Hello?World#")?;
 
-        assert_eq!(String::from_utf8_lossy(data_url.data()), "Hello?World");
+        assert_eq!(data_url.text(), "Hello?World");
 
         Ok(())
     }
@@ -40,7 +40,7 @@ mod passing {
     fn must_parse_empty_query_as_part_of_data() -> Result<(), DataUrlParseError> {
         let data_url: DataUrl = DataUrl::parse("data:;,Hello?#")?;
 
-        assert_eq!(String::from_utf8_lossy(data_url.data()), "Hello?");
+        assert_eq!(data_url.text(), "Hello?");
 
         Ok(())
     }
@@ -96,7 +96,7 @@ mod passing {
 
         assert_eq!(data_url.media_type(), "text/css".to_string());
         assert_eq!(data_url.charset(), "UTF-8".to_string());
-        assert!(data_url.base64_encoded());
+        assert!(data_url.is_base64_encoded());
         assert_eq!(data_url.data(), [195, 156]);
         assert_eq!(data_url.text(), "Ü");
         assert_eq!(data_url.fragment(), None);
@@ -111,7 +111,7 @@ mod passing {
 
         assert_eq!(data_url.media_type(), "text/css".to_string());
         assert_eq!(data_url.charset(), "UTF-8".to_string());
-        assert!(data_url.base64_encoded());
+        assert!(data_url.is_base64_encoded());
         assert_eq!(data_url.data(), [195, 156]);
         assert_eq!(data_url.text(), "Ü");
         assert_eq!(data_url.fragment(), None);
@@ -128,7 +128,7 @@ mod passing {
 
         assert_eq!(data_url.media_type(), "text/css".to_string());
         assert_eq!(data_url.charset(), "UTF-8".to_string());
-        assert!(data_url.base64_encoded());
+        assert!(data_url.is_base64_encoded());
         assert_eq!(data_url.data(), [195, 156]);
         assert_eq!(data_url.text(), "Ü");
         assert_eq!(data_url.fragment(), None);
@@ -145,7 +145,7 @@ mod passing {
 
     //     assert_eq!(data_url.media_type(), "text/css".to_string());
     //     assert_eq!(data_url.charset(), "UTF-8".to_string());
-    //     assert!(data_url.encoded());
+    //     assert!(data_url.is_base64_encoded());
     //     assert_eq!(data_url.data(), [195, 156]);
     //     assert_eq!(data_url.text(), "Ü");
     //     assert_eq!(data_url.fragment(), None);
@@ -186,7 +186,7 @@ mod failing {
 
         assert_eq!(data_url.media_type(), "text/plain".to_string());
         assert_eq!(data_url.charset(), "US-ASCII".to_string());
-        assert!(!data_url.base64_encoded());
+        assert!(!data_url.is_base64_encoded());
         assert_eq!(
             String::from_utf8_lossy(data_url.data()),
             "SGVsbG8sIHdvcmxkIQo="
@@ -202,7 +202,7 @@ mod failing {
 
         assert_eq!(data_url.media_type(), "text/plain".to_string());
         assert_eq!(data_url.charset(), "US-ASCII".to_string());
-        assert!(data_url.base64_encoded());
+        assert!(data_url.is_base64_encoded());
         assert_eq!(data_url.data(), []);
         assert_eq!(data_url.fragment(), None);
 
@@ -215,7 +215,7 @@ mod failing {
 
         assert_eq!(data_url.media_type(), "text/plain".to_string());
         assert_eq!(data_url.charset(), "US-ASCII".to_string());
-        assert!(!data_url.base64_encoded());
+        assert!(!data_url.is_base64_encoded());
         assert_eq!(data_url.data(), []);
         assert_eq!(data_url.fragment(), None);
 
@@ -229,7 +229,7 @@ mod failing {
 
         assert_eq!(data_url.media_type(), "text/css".to_string());
         assert_eq!(data_url.charset(), "US-ASCII".to_string());
-        assert!(data_url.base64_encoded());
+        assert!(data_url.is_base64_encoded());
         assert_eq!(data_url.data(), [195, 156]);
         assert_eq!(data_url.fragment(), None);
         assert_eq!(data_url.text(), "Ãœ");
