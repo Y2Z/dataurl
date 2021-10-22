@@ -15,7 +15,7 @@ fn main() {
                 .short("b")
                 .long("base64")
                 .multiple(false)
-                .help("Enforce base64 encoding"),
+                .help("Enforces base64 encoding"),
         )
         .arg(
             Arg::with_name("charset")
@@ -23,7 +23,7 @@ fn main() {
                 .long("charset")
                 .multiple(false)
                 .takes_value(true)
-                .help("Enforce custom charset"),
+                .help("Sets custom charset"),
         )
         .arg(
             Arg::with_name("decode")
@@ -38,7 +38,7 @@ fn main() {
                 .long("fragment")
                 .multiple(false)
                 .takes_value(true)
-                .help("Append URL fragment"),
+                .help("Appends URL fragment"),
         )
         .arg(
             Arg::with_name("input-file")
@@ -46,7 +46,7 @@ fn main() {
                 .long("input-file")
                 .multiple(false)
                 .takes_value(true)
-                .help("Append URL fragment"),
+                .help("Provides input file"),
         )
         .arg(
             Arg::with_name("media_type")
@@ -54,7 +54,7 @@ fn main() {
                 .long("media-type")
                 .multiple(false)
                 .takes_value(true)
-                .help("Sets custom media type for encode mode"),
+                .help("Sets custom media type"),
         )
         .arg(
             Arg::with_name("INPUT")

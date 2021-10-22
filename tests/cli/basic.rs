@@ -10,34 +10,39 @@ mod passing {
     use assert_cmd::prelude::*;
     use std::process::Command;
 
-    const HELP_MESSAGE: &'static str = "dataurl 0.0.1
+    #[test]
+    fn must_print_help_information_out_when_asked_to() {
+        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+        let assert = cmd.arg("-h").assert();
+
+        let help_message: String = format!(
+            "{bin} {ver}
 
 Sunshine <sunshine@uberspace.net>
 CLI tool and Rust crate for parsing and generating data URLs
 
 USAGE:
-    dataurl [FLAGS] [OPTIONS] [INPUT]
+    {bin}{exe} [FLAGS] [OPTIONS] [INPUT]
 
 FLAGS:
-    -b, --base64     Enforce base64 encoding
+    -b, --base64     Enforces base64 encoding
     -d, --decode     Toggles decode mode on
     -h, --help       Prints help information
     -V, --version    Prints version information
 
 OPTIONS:
-    -c, --charset <charset>          Enforce custom charset
-    -f, --fragment <fragment>        Append URL fragment
-    -i, --input-file <input-file>    Append URL fragment
-    -t, --media-type <media_type>    Sets custom media type for encode mode
+    -c, --charset <charset>          Sets custom charset
+    -f, --fragment <fragment>        Appends URL fragment
+    -i, --input-file <input-file>    Provides input file
+    -t, --media-type <media_type>    Sets custom media type
 
 ARGS:
     <INPUT>    Sets input string
-";
-
-    #[test]
-    fn must_print_help_information_out_when_asked_to() {
-        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
-        let assert = cmd.arg("-h").assert();
+",
+            bin = env!("CARGO_PKG_NAME"),
+            ver = env!("CARGO_PKG_VERSION"),
+            exe = if cfg!(windows) { ".exe" } else { "" }
+        );
 
         assert
             // Exit code must be 0
@@ -45,7 +50,7 @@ ARGS:
             // STDERR must be empty
             .stderr("")
             // STDOUT must contain program name, version, and usage information
-            .stdout(HELP_MESSAGE);
+            .stdout(help_message);
     }
 
     #[test]
@@ -60,9 +65,9 @@ ARGS:
             .stderr("")
             // STDOUT must contain program name and version
             .stdout(format!(
-                "{} {}\n",
-                env!("CARGO_PKG_NAME"),
-                env!("CARGO_PKG_VERSION")
+                "{bin} {ver}\n",
+                bin = env!("CARGO_PKG_NAME"),
+                ver = env!("CARGO_PKG_VERSION")
             ));
     }
 }
@@ -88,15 +93,17 @@ mod failing {
             // Exit code must be 1
             .failure()
             // STDERR must contain error message
-            .stderr(
+            .stderr(format!(
                 "error: Found argument '-X' which wasn't expected, or isn't valid in this context
 
 USAGE:
-    dataurl [FLAGS] [OPTIONS] [INPUT]
+    {bin}{exe} [FLAGS] [OPTIONS] [INPUT]
 
 For more information try --help
 ",
-            )
+                bin = env!("CARGO_PKG_NAME"),
+                exe = if cfg!(windows) { ".exe" } else { "" }
+            ))
             // STDOUT must contain absolutely nothing
             .stdout("");
     }
