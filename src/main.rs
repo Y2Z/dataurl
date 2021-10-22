@@ -41,7 +41,7 @@ fn main() {
                 .help("Appends URL fragment"),
         )
         .arg(
-            Arg::with_name("input-file")
+            Arg::with_name("FILE")
                 .short("i")
                 .long("input-file")
                 .multiple(false)
@@ -60,20 +60,29 @@ fn main() {
         .get_matches();
 
     let is_in_decode_mode: bool = app.is_present("decode");
-    let input = if app.is_present("INPUT") {
-        app.value_of("INPUT").unwrap().to_string()
-    } else if app.is_present("input-file") {
-        fs::read_to_string(app.value_of("input-file").unwrap())
-            .expect("Something went wrong while trying to read the file")
+    let input: Vec<u8> = if app.is_present("INPUT") {
+        app.value_of("INPUT").unwrap().as_bytes().to_vec()
+    } else if app.is_present("FILE") {
+        match fs::read(app.value_of("FILE").unwrap()) {
+            Ok(f) => f,
+            Err(_) => {
+                eprintln!(
+                    "Error: unable to read input file {}.",
+                    app.value_of("FILE").unwrap()
+                );
+                std::process::exit(1);
+            }
+        }
     } else {
         eprintln!("Error: no input provided.");
-        "".to_string()
+        vec![]
     };
 
     if is_in_decode_mode {
-        std::process::exit(match DataUrl::parse(&input) {
+        let input_as_string: &str = std::str::from_utf8(&input).unwrap();
+        std::process::exit(match DataUrl::parse(input_as_string) {
             Ok(data_url) => {
-                println!("{}", String::from_utf8_lossy(data_url.get_data()));
+                println!("{}", data_url.get_text());
                 0
             }
             Err(err) => {
@@ -83,18 +92,25 @@ fn main() {
         });
     } else {
         let mut data_url = DataUrl::new();
-        data_url.set_data(input.as_bytes());
+        data_url.set_data(&input);
         if app.is_present("base64") {
             data_url.set_is_base64_encoded(true);
         }
         if app.is_present("charset") {
-            data_url.set_charset(Some(app.value_of("charset").unwrap().to_string()));
+            let charset: &str = app.value_of("charset").unwrap();
+            let success: bool = data_url.set_charset(Some(charset.to_string()));
+
+            if !success {
+                eprintln!("Error: invalid charset {}.", charset);
+                std::process::exit(1);
+            }
         }
         if app.is_present("media_type") {
-            let success: bool =
-                data_url.set_media_type(Some(app.value_of("media_type").unwrap().to_string()));
+            let media_type: &str = app.value_of("media_type").unwrap();
+            let success: bool = data_url.set_media_type(Some(media_type.to_string()));
+
             if !success {
-                eprintln!("Error: invalid media type.");
+                eprintln!("Error: invalid media type {}.", media_type);
                 std::process::exit(1);
             }
         }

@@ -31,9 +31,9 @@ FLAGS:
     -V, --version    Prints version information
 
 OPTIONS:
+    -i, --input-file <FILE>          Provides input file
     -c, --charset <charset>          Sets custom charset
     -f, --fragment <fragment>        Appends URL fragment
-    -i, --input-file <input-file>    Provides input file
     -t, --media-type <media_type>    Sets custom media type
 
 ARGS:

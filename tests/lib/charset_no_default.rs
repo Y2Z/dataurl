@@ -22,7 +22,7 @@ mod passing {
     fn must_be_possible_to_set_to_utf8() -> Result<(), DataUrlParseError> {
         let mut data_url = DataUrl::new();
 
-        data_url.set_charset(Some("utf8".to_string()));
+        assert!(data_url.set_charset(Some("utf8".to_string())));
 
         assert_eq!(data_url.get_charset_no_default(), Some("UTF-8".to_string()));
 
@@ -45,7 +45,8 @@ mod failing {
     fn must_fall_back_to_none_if_given_bad_charset() -> Result<(), DataUrlParseError> {
         let mut data_url = DataUrl::new();
 
-        data_url.set_charset(Some("BAD-CHARSET".to_string())); // This bad input must make it fall back to US-ASCII
+        // This bad input must make it fall back to US-ASCII
+        assert!(!data_url.set_charset(Some("BAD-CHARSET".to_string())));
 
         assert_eq!(data_url.get_charset_no_default(), None);
 

@@ -13,7 +13,6 @@ mod passing {
     #[test]
     fn must_generate_empty_data_url_when_empty_arg_input_is_given() {
         let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
-
         let assert = cmd.arg("").assert();
 
         assert
@@ -28,7 +27,6 @@ mod passing {
     #[test]
     fn must_generate_data_url_when_basic_arg_input_is_given() {
         let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
-
         let assert = cmd.arg("Hello, world!").assert();
 
         assert
@@ -43,7 +41,6 @@ mod passing {
     #[test]
     fn must_generate_empty_base64_encoded_data_url_when_b_flag_and_empty_arg_input_are_given() {
         let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
-
         let assert = cmd.arg("-b").arg("").assert();
 
         assert
@@ -59,7 +56,6 @@ mod passing {
     fn must_generate_short_base64_encoded_data_url_when_b_flag_and_whitespace_arg_input_are_given()
     {
         let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
-
         let assert = cmd.arg("-b").arg(" ").assert();
 
         assert
@@ -74,7 +70,6 @@ mod passing {
     #[test]
     fn must_support_setting_media_type() {
         let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
-
         let assert = cmd.arg("-b").arg(" ").arg("-t").arg("text/html").assert();
 
         assert
@@ -89,7 +84,6 @@ mod passing {
     #[test]
     fn must_support_setting_charset() {
         let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
-
         let assert = cmd.arg("-b").arg(" ").arg("-c").arg("utf8").assert();
 
         assert
@@ -104,7 +98,6 @@ mod passing {
     #[test]
     fn must_set_fragment_if_provided() {
         let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
-
         let assert = cmd.arg("-b").arg(" ").arg("-f").arg("something").assert();
 
         assert
@@ -119,7 +112,6 @@ mod passing {
     #[test]
     fn must_set_empty_fragment_if_provided() {
         let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
-
         let assert = cmd.arg("-b").arg(" ").arg("-f").arg("").assert();
 
         assert
@@ -157,7 +149,21 @@ mod failing {
             // Exit code must be 1
             .failure()
             // STDERR must contain error message
-            .stderr("Error: invalid media type.\n")
+            .stderr("Error: invalid media type wrong/media/type.\n")
+            // STDOUT must be empty
+            .stdout("");
+    }
+
+    #[test]
+    fn must_not_allow_incorrect_charset_to_be_set() {
+        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+        let assert = cmd.arg("-c").arg("BAD-CHARSET").arg("something").assert();
+
+        assert
+            // Exit code must be 1
+            .failure()
+            // STDERR must contain error message
+            .stderr("Error: invalid charset BAD-CHARSET.\n")
             // STDOUT must be empty
             .stdout("");
     }

@@ -23,6 +23,23 @@ mod passing {
             // STDOUT must contain nothing but a newline
             .stdout("\n");
     }
+
+    #[test]
+    fn must_properly_parse_and_output_gbk_encoded_data_urls() {
+        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+        let assert = cmd
+            .arg("-d")
+            .arg("data:;charset=gbk;base64,PbnjtqvKocnu29rK0LGmsLI=")
+            .assert();
+
+        assert
+            // Exit code must be 0
+            .success()
+            // STDERR must be completely empty
+            .stderr("")
+            // STDOUT must contain nothing but a newline
+            .stdout("=广东省深圳市宝安\n");
+    }
 }
 
 //  ███████╗ █████╗ ██╗██╗     ██╗███╗   ██╗ ██████╗
