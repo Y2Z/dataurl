@@ -56,12 +56,7 @@ fn main() {
                 .takes_value(true)
                 .help("Sets custom media type"),
         )
-        .arg(
-            Arg::with_name("INPUT")
-                .help("Sets input string")
-                .required(false)
-                .index(1),
-        )
+        .arg(Arg::with_name("INPUT").help("Input string").required(false))
         .get_matches();
 
     let is_in_decode_mode: bool = app.is_present("decode");

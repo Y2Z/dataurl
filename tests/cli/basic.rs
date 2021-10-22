@@ -37,7 +37,7 @@ OPTIONS:
     -t, --media-type <media_type>    Sets custom media type
 
 ARGS:
-    <INPUT>    Sets input string
+    <INPUT>    Input string
 ",
             bin = env!("CARGO_PKG_NAME"),
             ver = env!("CARGO_PKG_VERSION"),
