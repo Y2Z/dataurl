@@ -15,7 +15,7 @@ fn main() {
                 .short("b")
                 .long("base64")
                 .multiple(false)
-                .help("Enforce base64 encoding"),
+                .help("Enforces base64 encoding"),
         )
         .arg(
             Arg::with_name("charset")
@@ -23,7 +23,7 @@ fn main() {
                 .long("charset")
                 .multiple(false)
                 .takes_value(true)
-                .help("Enforce custom charset"),
+                .help("Sets custom charset"),
         )
         .arg(
             Arg::with_name("decode")
@@ -38,15 +38,15 @@ fn main() {
                 .long("fragment")
                 .multiple(false)
                 .takes_value(true)
-                .help("Append URL fragment"),
+                .help("Appends URL fragment"),
         )
         .arg(
-            Arg::with_name("input-file")
+            Arg::with_name("FILE")
                 .short("i")
                 .long("input-file")
                 .multiple(false)
                 .takes_value(true)
-                .help("Append URL fragment"),
+                .help("Provides input file"),
         )
         .arg(
             Arg::with_name("media_type")
@@ -54,51 +54,70 @@ fn main() {
                 .long("media-type")
                 .multiple(false)
                 .takes_value(true)
-                .help("Sets custom media type for encode mode"),
+                .help("Sets custom media type"),
         )
-        .arg(
-            Arg::with_name("INPUT")
-                .help("Sets input string")
-                .required(false)
-                .index(1),
-        )
+        .arg(Arg::with_name("INPUT").help("Input string").required(false))
         .get_matches();
 
     let is_in_decode_mode: bool = app.is_present("decode");
-    let input = if app.is_present("INPUT") {
-        app.value_of("INPUT").unwrap().to_string()
-    } else if app.is_present("input-file") {
-        fs::read_to_string(app.value_of("input-file").unwrap())
-            .expect("Something went wrong reading the file")
+    let input: Vec<u8> = if app.is_present("INPUT") {
+        app.value_of("INPUT").unwrap().as_bytes().to_vec()
+    } else if app.is_present("FILE") {
+        match fs::read(app.value_of("FILE").unwrap()) {
+            Ok(f) => f,
+            Err(_) => {
+                eprintln!(
+                    "Error: unable to read input file {}.",
+                    app.value_of("FILE").unwrap()
+                );
+                std::process::exit(1);
+            }
+        }
     } else {
-        eprintln!("no input provided");
-        "".to_string()
+        eprintln!("Error: no input provided.");
+        vec![]
     };
 
     if is_in_decode_mode {
-        match DataUrl::parse(&input) {
+        let input_as_string: &str = std::str::from_utf8(&input).unwrap();
+        std::process::exit(match DataUrl::parse(input_as_string) {
             Ok(data_url) => {
-                println!("{}", String::from_utf8_lossy(data_url.data()));
+                println!("{}", data_url.get_text());
+                0
             }
-            Err(_data_url_parse_err) => {
-                eprintln!("parsing error");
+            Err(err) => {
+                eprintln!("Error: {:?}.", err);
+                1
             }
-        }
+        });
     } else {
         let mut data_url = DataUrl::new();
-        data_url.set_data(input.as_bytes());
+        data_url.set_data(&input);
         if app.is_present("base64") {
-            data_url.set_base64_encoded(true);
+            data_url.set_is_base64_encoded(true);
         }
         if app.is_present("charset") {
-            data_url.set_charset(Some(app.value_of("charset").unwrap().to_string()));
+            let charset: &str = app.value_of("charset").unwrap();
+            let success: bool = data_url.set_charset(Some(charset.to_string()));
+
+            if !success {
+                eprintln!("Error: invalid charset {}.", charset);
+                std::process::exit(1);
+            }
         }
         if app.is_present("media_type") {
-            data_url.set_media_type(Some(app.value_of("media_type").unwrap().to_string()));
+            let media_type: &str = app.value_of("media_type").unwrap();
+            let success: bool = data_url.set_media_type(Some(media_type.to_string()));
+
+            if !success {
+                eprintln!("Error: invalid media type {}.", media_type);
+                std::process::exit(1);
+            }
         }
         if app.is_present("fragment") {
             data_url.set_fragment(Some(app.value_of("fragment").unwrap().to_string()));
         }
         println!("{}", data_url.to_string());
+        std::process::exit(0);
     }
 }

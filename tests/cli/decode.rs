@@ -7,46 +7,38 @@
 
 #[cfg(test)]
 mod passing {
-    use dataurl::{DataUrl, DataUrlParseError};
+    use assert_cmd::prelude::*;
+    use std::process::Command;
 
     #[test]
-    fn must_be_empty_by_default() -> Result<(), DataUrlParseError> {
-        let data_url = DataUrl::new();
+    fn must_parse_empty_data_url_arg_input_and_output_nothing_into_stdout_but_a_newline() {
+        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+        let assert = cmd.arg("-d").arg("data:,").assert();
 
-        assert_eq!(data_url.get_text(), "");
-
-        Ok(())
+        assert
+            // Exit code must be 0
+            .success()
+            // STDERR must be completely empty
+            .stderr("")
+            // STDOUT must contain nothing but a newline
+            .stdout("\n");
     }
 
     #[test]
-    fn must_remain_empty_after_given_empty_data() -> Result<(), DataUrlParseError> {
-        let mut data_url = DataUrl::new();
+    fn must_properly_parse_and_output_gbk_encoded_data_urls() {
+        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+        let assert = cmd
+            .arg("-d")
+            .arg("data:;charset=gbk;base64,PbnjtqvKocnu29rK0LGmsLI=")
+            .assert();
 
-        data_url.set_data(&[]);
-        assert_eq!(data_url.get_text(), "");
-
-        Ok(())
-    }
-
-    #[test]
-    fn must_accept_and_return_same_ascii_text() -> Result<(), DataUrlParseError> {
-        let mut data_url = DataUrl::new();
-
-        data_url.set_data(b"some text");
-        assert_eq!(data_url.get_text(), "some text");
-
-        Ok(())
-    }
-
-    #[test]
-    fn must_accept_and_return_same_utf8_text() -> Result<(), DataUrlParseError> {
-        let mut data_url = DataUrl::new();
-
-        data_url.set_charset(Some("utf8".to_string()));
-        data_url.set_data("Ü".as_bytes());
-        assert_eq!(data_url.get_text(), "Ü");
-
-        Ok(())
+        assert
+            // Exit code must be 0
+            .success()
+            // STDERR must be completely empty
+            .stderr("")
+            // STDOUT must contain nothing but a newline
+            .stdout("=广东省深圳市宝安\n");
     }
 }
 
@@ -59,16 +51,21 @@ mod passing {
 
 #[cfg(test)]
 mod failing {
-    use dataurl::{DataUrl, DataUrlParseError};
+    use assert_cmd::prelude::*;
+    use std::process::Command;
 
     #[test]
-    fn must_return_garbage_when_given_unicode_data_without_setting_charset_to_utf8(
-    ) -> Result<(), DataUrlParseError> {
-        let mut data_url = DataUrl::new();
+    fn must_fail_if_given_empty_arg_input_and_output_error_message_into_stderr_and_nothing_into_stdout(
+    ) {
+        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+        let assert = cmd.arg("-d").arg("").assert();
 
-        data_url.set_data("Ü".as_bytes());
-        assert_eq!(data_url.get_text(), "Ãœ");
-
-        Ok(())
+        assert
+            // Exit code must be 1
+            .failure()
+            // STDERR must contain error message
+            .stderr("Error: DataUrlParseError.\n")
+            // STDOUT must be empty
+            .stdout("");
     }
 }

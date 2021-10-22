@@ -13,7 +13,7 @@ mod passing {
     fn must_trim_spaces_around_url() -> Result<(), DataUrlParseError> {
         let data_url: DataUrl = DataUrl::parse(" data:, a b ")?;
 
-        assert_eq!(data_url.data(), " a b".as_bytes());
+        assert_eq!(data_url.get_data(), " a b".as_bytes());
 
         Ok(())
     }
@@ -22,7 +22,7 @@ mod passing {
     fn must_be_able_to_parse_url_with_no_media_type() -> Result<(), DataUrlParseError> {
         let data_url: DataUrl = DataUrl::parse("data:,Hello,%20World!")?;
 
-        assert_eq!(String::from_utf8_lossy(data_url.data()), "Hello, World!");
+        assert_eq!(data_url.get_text(), "Hello, World!");
 
         Ok(())
     }
@@ -31,7 +31,7 @@ mod passing {
     fn must_parse_query_as_part_of_data() -> Result<(), DataUrlParseError> {
         let data_url: DataUrl = DataUrl::parse("data:;,Hello?World#")?;
 
-        assert_eq!(String::from_utf8_lossy(data_url.data()), "Hello?World");
+        assert_eq!(data_url.get_text(), "Hello?World");
 
         Ok(())
     }
@@ -40,7 +40,7 @@ mod passing {
     fn must_parse_empty_query_as_part_of_data() -> Result<(), DataUrlParseError> {
         let data_url: DataUrl = DataUrl::parse("data:;,Hello?#")?;
 
-        assert_eq!(String::from_utf8_lossy(data_url.data()), "Hello?");
+        assert_eq!(data_url.get_text(), "Hello?");
 
         Ok(())
     }
@@ -49,7 +49,7 @@ mod passing {
     fn must_parse_utf8_charset_no_media_type() -> Result<(), DataUrlParseError> {
         let data_url: DataUrl = DataUrl::parse("data:;charset=utf8,")?;
 
-        assert_eq!(data_url.charset(), "UTF-8".to_string());
+        assert_eq!(data_url.get_charset(), "UTF-8".to_string());
 
         Ok(())
     }
@@ -58,7 +58,7 @@ mod passing {
     fn must_parse_utf8_charset_no_media_type_encoded() -> Result<(), DataUrlParseError> {
         let data_url: DataUrl = DataUrl::parse("data:;charset=utf8;base64,")?;
 
-        assert_eq!(data_url.charset(), "UTF-8".to_string());
+        assert_eq!(data_url.get_charset(), "UTF-8".to_string());
 
         Ok(())
     }
@@ -67,7 +67,7 @@ mod passing {
     fn must_parse_utf8_charset_with_media_type() -> Result<(), DataUrlParseError> {
         let data_url: DataUrl = DataUrl::parse("data:text/html;charset=utf8,")?;
 
-        assert_eq!(data_url.charset(), "UTF-8".to_string());
+        assert_eq!(data_url.get_charset(), "UTF-8".to_string());
 
         Ok(())
     }
@@ -76,7 +76,7 @@ mod passing {
     fn must_parse_utf8_charset_with_media_type_encoded() -> Result<(), DataUrlParseError> {
         let data_url: DataUrl = DataUrl::parse("data:text/html;charset=utf8;base64,")?;
 
-        assert_eq!(data_url.charset(), "UTF-8".to_string());
+        assert_eq!(data_url.get_charset(), "UTF-8".to_string());
 
         Ok(())
     }
@@ -85,7 +85,7 @@ mod passing {
     fn must_parse_unicode_emoji() -> Result<(), DataUrlParseError> {
         let data_url: DataUrl = DataUrl::parse("data:;charset=utf8;base64,4piA77iP")?;
 
-        assert_eq!(data_url.data(), [226, 152, 128, 239, 184, 143]);
+        assert_eq!(data_url.get_data(), [226, 152, 128, 239, 184, 143]);
 
         Ok(())
     }
@@ -94,12 +94,12 @@ mod passing {
     fn must_parse_all_caps() -> Result<(), DataUrlParseError> {
         let data_url: DataUrl = DataUrl::parse("data:TEXT/CSS;CHARSET=UTF8;BASE64,w5w=")?;
 
-        assert_eq!(data_url.media_type(), "text/css".to_string());
-        assert_eq!(data_url.charset(), "UTF-8".to_string());
-        assert!(data_url.base64_encoded());
-        assert_eq!(data_url.data(), [195, 156]);
-        assert_eq!(data_url.text(), "Ü");
-        assert_eq!(data_url.fragment(), None);
+        assert_eq!(data_url.get_media_type(), "text/css".to_string());
+        assert_eq!(data_url.get_charset(), "UTF-8".to_string());
+        assert!(data_url.get_is_base64_encoded());
+        assert_eq!(data_url.get_data(), [195, 156]);
+        assert_eq!(data_url.get_text(), "Ü");
+        assert_eq!(data_url.get_fragment(), None);
 
         Ok(())
     }
@@ -109,12 +109,12 @@ mod passing {
         let data_url: DataUrl =
             DataUrl::parse("data:TEXT/CSS;filename=x.css;charset=Utf-8;BASE64;somethingelse,w5w=")?;
 
-        assert_eq!(data_url.media_type(), "text/css".to_string());
-        assert_eq!(data_url.charset(), "UTF-8".to_string());
-        assert!(data_url.base64_encoded());
-        assert_eq!(data_url.data(), [195, 156]);
-        assert_eq!(data_url.text(), "Ü");
-        assert_eq!(data_url.fragment(), None);
+        assert_eq!(data_url.get_media_type(), "text/css".to_string());
+        assert_eq!(data_url.get_charset(), "UTF-8".to_string());
+        assert!(data_url.get_is_base64_encoded());
+        assert_eq!(data_url.get_data(), [195, 156]);
+        assert_eq!(data_url.get_text(), "Ü");
+        assert_eq!(data_url.get_fragment(), None);
 
         Ok(())
     }
@@ -126,12 +126,12 @@ mod passing {
             "data:TEXT/CSS;charset=Utf-8;filename=x;charset=US-ASCII;BASE64;somethingelse,w5w=",
         )?;
 
-        assert_eq!(data_url.media_type(), "text/css".to_string());
-        assert_eq!(data_url.charset(), "UTF-8".to_string());
-        assert!(data_url.base64_encoded());
-        assert_eq!(data_url.data(), [195, 156]);
-        assert_eq!(data_url.text(), "Ü");
-        assert_eq!(data_url.fragment(), None);
+        assert_eq!(data_url.get_media_type(), "text/css".to_string());
+        assert_eq!(data_url.get_charset(), "UTF-8".to_string());
+        assert!(data_url.get_is_base64_encoded());
+        assert_eq!(data_url.get_data(), [195, 156]);
+        assert_eq!(data_url.get_text(), "Ü");
+        assert_eq!(data_url.get_fragment(), None);
 
         Ok(())
     }
@@ -143,12 +143,12 @@ mod passing {
     //         "data:TEXT/CSS; charset=Utf-8; filename=x; charset = US-ASCII; BASE64; somethingelse ,w5w=",
     //     )?;
 
-    //     assert_eq!(data_url.media_type(), "text/css".to_string());
-    //     assert_eq!(data_url.charset(), "UTF-8".to_string());
-    //     assert!(data_url.encoded());
-    //     assert_eq!(data_url.data(), [195, 156]);
-    //     assert_eq!(data_url.text(), "Ü");
-    //     assert_eq!(data_url.fragment(), None);
+    //     assert_eq!(data_url.get_media_type(), "text/css".to_string());
+    //     assert_eq!(data_url.get_charset(), "UTF-8".to_string());
+    //     assert!(data_url.get_is_base64_encoded());
+    //     assert_eq!(data_url.get_data(), [195, 156]);
+    //     assert_eq!(data_url.get_text(), "Ü");
+    //     assert_eq!(data_url.get_fragment(), None);
 
     //     Ok(())
     // }
@@ -184,14 +184,14 @@ mod failing {
     ) -> Result<(), DataUrlParseError> {
         let data_url: DataUrl = DataUrl::parse("data:base64,SGVsbG8sIHdvcmxkIQo=")?;
 
-        assert_eq!(data_url.media_type(), "text/plain".to_string());
-        assert_eq!(data_url.charset(), "US-ASCII".to_string());
-        assert!(!data_url.base64_encoded());
+        assert_eq!(data_url.get_media_type(), "text/plain".to_string());
+        assert_eq!(data_url.get_charset(), "US-ASCII".to_string());
+        assert!(!data_url.get_is_base64_encoded());
         assert_eq!(
-            String::from_utf8_lossy(data_url.data()),
+            String::from_utf8_lossy(data_url.get_data()),
             "SGVsbG8sIHdvcmxkIQo="
         );
-        assert_eq!(data_url.fragment(), None);
+        assert_eq!(data_url.get_fragment(), None);
 
         Ok(())
     }
@@ -200,11 +200,11 @@ mod failing {
     fn must_fall_back_to_us_ascii_if_given_bad_charset() -> Result<(), DataUrlParseError> {
         let data_url: DataUrl = DataUrl::parse("data:;charset=BAD-CHARSET;base64,")?;
 
-        assert_eq!(data_url.media_type(), "text/plain".to_string());
-        assert_eq!(data_url.charset(), "US-ASCII".to_string());
-        assert!(data_url.base64_encoded());
-        assert_eq!(data_url.data(), []);
-        assert_eq!(data_url.fragment(), None);
+        assert_eq!(data_url.get_media_type(), "text/plain".to_string());
+        assert_eq!(data_url.get_charset(), "US-ASCII".to_string());
+        assert!(data_url.get_is_base64_encoded());
+        assert_eq!(data_url.get_data(), []);
+        assert_eq!(data_url.get_fragment(), None);
 
         Ok(())
     }
@@ -213,11 +213,11 @@ mod failing {
     fn must_fall_back_to_text_plain_if_given_bad_media_type() -> Result<(), DataUrlParseError> {
         let data_url: DataUrl = DataUrl::parse("data:bad;,")?;
 
-        assert_eq!(data_url.media_type(), "text/plain".to_string());
-        assert_eq!(data_url.charset(), "US-ASCII".to_string());
-        assert!(!data_url.base64_encoded());
-        assert_eq!(data_url.data(), []);
-        assert_eq!(data_url.fragment(), None);
+        assert_eq!(data_url.get_media_type(), "text/plain".to_string());
+        assert_eq!(data_url.get_charset(), "US-ASCII".to_string());
+        assert!(!data_url.get_is_base64_encoded());
+        assert_eq!(data_url.get_data(), []);
+        assert_eq!(data_url.get_fragment(), None);
 
         Ok(())
     }
@@ -227,12 +227,12 @@ mod failing {
     ) -> Result<(), DataUrlParseError> {
         let mut data_url: DataUrl = DataUrl::parse("data:text/css;base64;charset=utf8,w5w=")?;
 
-        assert_eq!(data_url.media_type(), "text/css".to_string());
-        assert_eq!(data_url.charset(), "US-ASCII".to_string());
-        assert!(data_url.base64_encoded());
-        assert_eq!(data_url.data(), [195, 156]);
-        assert_eq!(data_url.fragment(), None);
-        assert_eq!(data_url.text(), "Ãœ");
+        assert_eq!(data_url.get_media_type(), "text/css".to_string());
+        assert_eq!(data_url.get_charset(), "US-ASCII".to_string());
+        assert!(data_url.get_is_base64_encoded());
+        assert_eq!(data_url.get_data(), [195, 156]);
+        assert_eq!(data_url.get_fragment(), None);
+        assert_eq!(data_url.get_text(), "Ãœ");
         // Different from the original her because we needed to encode "Ãœ" as US-ASCII, which is 4 bytes
         assert_eq!(data_url.to_string(), "data:text/css;base64,w4PFkw==");
         data_url.set_charset(Some("utf-8".to_string()));

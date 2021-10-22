@@ -1,2 +1,2 @@
-// mod cli;
+mod cli;
 mod lib;
