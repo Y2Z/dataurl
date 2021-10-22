@@ -70,6 +70,66 @@ mod passing {
             // STDOUT must contain generated data URL
             .stdout("data:;base64,IA==\n");
     }
+
+    #[test]
+    fn must_support_setting_media_type() {
+        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+
+        let assert = cmd.arg("-b").arg(" ").arg("-t").arg("text/html").assert();
+
+        assert
+            // Exit code must be 0
+            .success()
+            // STDERR must be empty
+            .stderr("")
+            // STDOUT must contain generated data URL
+            .stdout("data:text/html;base64,IA==\n");
+    }
+
+    #[test]
+    fn must_support_setting_charset() {
+        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+
+        let assert = cmd.arg("-b").arg(" ").arg("-c").arg("utf8").assert();
+
+        assert
+            // Exit code must be 0
+            .success()
+            // STDERR must be empty
+            .stderr("")
+            // STDOUT must contain generated data URL
+            .stdout("data:;charset=UTF-8;base64,IA==\n");
+    }
+
+    #[test]
+    fn must_set_fragment_if_provided() {
+        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+
+        let assert = cmd.arg("-b").arg(" ").arg("-f").arg("something").assert();
+
+        assert
+            // Exit code must be 0
+            .success()
+            // STDERR must be empty
+            .stderr("")
+            // STDOUT must contain generated data URL
+            .stdout("data:;base64,IA==#something\n");
+    }
+
+    #[test]
+    fn must_set_empty_fragment_if_provided() {
+        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+
+        let assert = cmd.arg("-b").arg(" ").arg("-f").arg("").assert();
+
+        assert
+            // Exit code must be 0
+            .success()
+            // STDERR must be empty
+            .stderr("")
+            // STDOUT must contain generated data URL
+            .stdout("data:;base64,IA==#\n");
+    }
 }
 
 //  ███████╗ █████╗ ██╗██╗     ██╗███╗   ██╗ ██████╗
