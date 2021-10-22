@@ -149,16 +149,19 @@ impl DataUrl {
         }
     }
 
-    pub fn set_media_type(&mut self, new_media_type: Option<String>) {
+    pub fn set_media_type(&mut self, new_media_type: Option<String>) -> bool {
         if let Some(mt) = new_media_type {
-            if mt.trim().len() > 0 {
+            if mt.trim().len() > 0 && validate_media_type(&mt) {
                 self.media_type = Some(mt.to_string());
+                true
             } else {
                 // Empty media type makes it fall back to default (text/plain)
                 self.media_type = None;
+                false
             }
         } else {
             self.media_type = None;
+            true
         }
     }
 
@@ -178,17 +181,20 @@ impl DataUrl {
         }
     }
 
-    pub fn set_charset(&mut self, new_charset: Option<String>) {
+    pub fn set_charset(&mut self, new_charset: Option<String>) -> bool {
         if let Some(c) = new_charset {
             // Validate the input
             if let Some(e) = Encoding::for_label_no_replacement(c.as_bytes()) {
                 self.charset = Some(e.name().to_string());
+                true
             } else {
                 // Since browsers fall back to US-ASCII, so do we
                 self.charset = None;
+                false
             }
         } else {
             self.charset = None;
+            true
         }
     }
 

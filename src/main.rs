@@ -71,7 +71,7 @@ fn main() {
         fs::read_to_string(app.value_of("input-file").unwrap())
             .expect("Something went wrong while trying to read the file")
     } else {
-        eprintln!("no input provided");
+        eprintln!("Error: no input provided.");
         "".to_string()
     };
 
@@ -82,7 +82,7 @@ fn main() {
                 0
             }
             Err(err) => {
-                eprintln!("error: {:?}", err);
+                eprintln!("Error: {:?}.", err);
                 1
             }
         });
@@ -96,7 +96,12 @@ fn main() {
             data_url.set_charset(Some(app.value_of("charset").unwrap().to_string()));
         }
         if app.is_present("media_type") {
-            data_url.set_media_type(Some(app.value_of("media_type").unwrap().to_string()));
+            let success: bool =
+                data_url.set_media_type(Some(app.value_of("media_type").unwrap().to_string()));
+            if !success {
+                eprintln!("Error: invalid media type.");
+                std::process::exit(1);
+            }
         }
         if app.is_present("fragment") {
             data_url.set_fragment(Some(app.value_of("fragment").unwrap().to_string()));

@@ -40,11 +40,11 @@ ARGS:
         let assert = cmd.arg("-h").assert();
 
         assert
-            // Exit code should be 0
+            // Exit code must be 0
             .success()
-            // STDERR should be empty
+            // STDERR must be empty
             .stderr("")
-            // STDOUT should contain program name, version, and usage information
+            // STDOUT must contain program name, version, and usage information
             .stdout(HELP_MESSAGE);
     }
 
@@ -54,11 +54,11 @@ ARGS:
         let assert = cmd.arg("-V").assert();
 
         assert
-            // Exit code should be 0
+            // Exit code must be 0
             .success()
-            // STDERR should be empty
+            // STDERR must be empty
             .stderr("")
-            // STDOUT should contain program name and version
+            // STDOUT must contain program name and version
             .stdout(format!(
                 "{} {}\n",
                 env!("CARGO_PKG_NAME"),
@@ -85,9 +85,9 @@ mod failing {
         let assert = cmd.arg("-X").arg("").assert();
 
         assert
-            // Exit code should be 1
+            // Exit code must be 1
             .failure()
-            // STDERR should contain error message
+            // STDERR must contain error message
             .stderr(
                 "error: Found argument '-X' which wasn't expected, or isn't valid in this context
 
@@ -97,7 +97,7 @@ USAGE:
 For more information try --help
 ",
             )
-            // STDOUT should contain absolutely nothing
+            // STDOUT must contain absolutely nothing
             .stdout("");
     }
 }

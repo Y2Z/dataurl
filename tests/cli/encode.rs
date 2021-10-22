@@ -17,11 +17,11 @@ mod passing {
         let assert = cmd.arg("").assert();
 
         assert
-            // Exit code should be 0
+            // Exit code must be 0
             .success()
-            // STDERR should be empty
+            // STDERR must be empty
             .stderr("")
-            // STDOUT should contain generated data URL
+            // STDOUT must contain generated data URL
             .stdout("data:,\n");
     }
 
@@ -32,11 +32,11 @@ mod passing {
         let assert = cmd.arg("Hello, world!").assert();
 
         assert
-            // Exit code should be 0
+            // Exit code must be 0
             .success()
-            // STDERR should be empty
+            // STDERR must be empty
             .stderr("")
-            // STDOUT should contain generated data URL
+            // STDOUT must contain generated data URL
             .stdout("data:,Hello%2C%20world%21\n");
     }
 
@@ -47,11 +47,11 @@ mod passing {
         let assert = cmd.arg("-b").arg("").assert();
 
         assert
-            // Exit code should be 0
+            // Exit code must be 0
             .success()
-            // STDERR should be empty
+            // STDERR must be empty
             .stderr("")
-            // STDOUT should contain generated data URL
+            // STDOUT must contain generated data URL
             .stdout("data:;base64,\n");
     }
 
@@ -63,11 +63,42 @@ mod passing {
         let assert = cmd.arg("-b").arg(" ").assert();
 
         assert
-            // Exit code should be 0
+            // Exit code must be 0
             .success()
-            // STDERR should be empty
+            // STDERR must be empty
             .stderr("")
-            // STDOUT should contain generated data URL
+            // STDOUT must contain generated data URL
             .stdout("data:;base64,IA==\n");
+    }
+}
+
+//  ███████╗ █████╗ ██╗██╗     ██╗███╗   ██╗ ██████╗
+//  ██╔════╝██╔══██╗██║██║     ██║████╗  ██║██╔════╝
+//  █████╗  ███████║██║██║     ██║██╔██╗ ██║██║  ███╗
+//  ██╔══╝  ██╔══██║██║██║     ██║██║╚██╗██║██║   ██║
+//  ██║     ██║  ██║██║███████╗██║██║ ╚████║╚██████╔╝
+//  ╚═╝     ╚═╝  ╚═╝╚═╝╚══════╝╚═╝╚═╝  ╚═══╝ ╚═════╝
+
+#[cfg(test)]
+mod failing {
+    use assert_cmd::prelude::*;
+    use std::process::Command;
+
+    #[test]
+    fn must_not_allow_incorrect_media_type_to_be_set() {
+        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+        let assert = cmd
+            .arg("-t")
+            .arg("wrong/media/type")
+            .arg("something")
+            .assert();
+
+        assert
+            // Exit code must be 1
+            .failure()
+            // STDERR must contain error message
+            .stderr("Error: invalid media type.\n")
+            // STDOUT must be empty
+            .stdout("");
     }
 }
