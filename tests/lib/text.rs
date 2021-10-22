@@ -13,7 +13,7 @@ mod passing {
     fn must_be_empty_by_default() -> Result<(), DataUrlParseError> {
         let data_url = DataUrl::new();
 
-        assert_eq!(data_url.text(), "");
+        assert_eq!(data_url.get_text(), "");
 
         Ok(())
     }
@@ -23,7 +23,7 @@ mod passing {
         let mut data_url = DataUrl::new();
 
         data_url.set_data(&[]);
-        assert_eq!(data_url.text(), "");
+        assert_eq!(data_url.get_text(), "");
 
         Ok(())
     }
@@ -33,7 +33,7 @@ mod passing {
         let mut data_url = DataUrl::new();
 
         data_url.set_data(b"some text");
-        assert_eq!(data_url.text(), "some text");
+        assert_eq!(data_url.get_text(), "some text");
 
         Ok(())
     }
@@ -44,7 +44,7 @@ mod passing {
 
         data_url.set_charset(Some("utf8".to_string()));
         data_url.set_data("Ü".as_bytes());
-        assert_eq!(data_url.text(), "Ü");
+        assert_eq!(data_url.get_text(), "Ü");
 
         Ok(())
     }
@@ -67,7 +67,7 @@ mod failing {
         let mut data_url = DataUrl::new();
 
         data_url.set_data("Ü".as_bytes());
-        assert_eq!(data_url.text(), "Ãœ");
+        assert_eq!(data_url.get_text(), "Ãœ");
 
         Ok(())
     }

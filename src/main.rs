@@ -78,7 +78,7 @@ fn main() {
     if is_in_decode_mode {
         match DataUrl::parse(&input) {
             Ok(data_url) => {
-                println!("{}", String::from_utf8_lossy(data_url.data()));
+                println!("{}", String::from_utf8_lossy(data_url.get_data()));
             }
             Err(_data_url_parse_err) => {
                 eprintln!("parsing error");

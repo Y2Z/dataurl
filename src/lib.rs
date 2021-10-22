@@ -12,6 +12,7 @@ pub struct DataUrl {
     is_base64_encoded: bool,    // Indicates if it's a base64-encoded data URL
     data: Vec<u8>,              // Data, bytes
     fragment: Option<String>,   // #something-at-the-end, None by default
+                                // TODO: add support for other optional parameters besides charset (filename, etc)
 }
 
 pub enum DataUrlParseError {
@@ -75,6 +76,7 @@ impl DataUrl {
         }
     }
 
+    // TODO: rename to from_string/from_str/from — look for how it's done for String and similar
     pub fn parse(input_str: &str) -> Result<Self, DataUrlParseError> {
         match Url::parse(input_str) {
             Ok(url) => {
@@ -131,7 +133,114 @@ impl DataUrl {
         }
     }
 
-    // TODO: make it a promise, throw error in case is_base64_encoded=false, and charset!=default|utf8
+    pub fn get_media_type(&self) -> &str {
+        if let Some(mt) = &self.media_type {
+            mt
+        } else {
+            DEFAULT_MEDIA_TYPE
+        }
+    }
+
+    pub fn get_media_type_no_default(&self) -> Option<String> {
+        if let Some(mt) = &self.media_type {
+            Some(mt.to_string())
+        } else {
+            None
+        }
+    }
+
+    pub fn set_media_type(&mut self, new_media_type: Option<String>) {
+        if let Some(mt) = new_media_type {
+            if mt.trim().len() > 0 {
+                self.media_type = Some(mt.to_string());
+            } else {
+                // Empty media type makes it fall back to default (text/plain)
+                self.media_type = None;
+            }
+        } else {
+            self.media_type = None;
+        }
+    }
+
+    pub fn get_charset(&self) -> &str {
+        if let Some(c) = &self.charset {
+            c
+        } else {
+            DEFAULT_CHARSET
+        }
+    }
+
+    pub fn get_charset_no_default(&self) -> Option<String> {
+        if let Some(c) = &self.charset {
+            Some(c.to_string())
+        } else {
+            None
+        }
+    }
+
+    pub fn set_charset(&mut self, new_charset: Option<String>) {
+        if let Some(c) = new_charset {
+            // Validate the input
+            if let Some(e) = Encoding::for_label_no_replacement(c.as_bytes()) {
+                self.charset = Some(e.name().to_string());
+            } else {
+                // Since browsers fall back to US-ASCII, so do we
+                self.charset = None;
+            }
+        } else {
+            self.charset = None;
+        }
+    }
+
+    pub fn get_is_base64_encoded(&self) -> bool {
+        self.is_base64_encoded
+    }
+
+    pub fn set_is_base64_encoded(&mut self, new_is_base64_encoded: bool) {
+        self.is_base64_encoded = new_is_base64_encoded;
+    }
+
+    pub fn get_data(&self) -> &[u8] {
+        &self.data
+    }
+
+    pub fn get_text(&self) -> String {
+        // This can never really fail
+        if let Some(encoding) = Encoding::for_label(
+            self.charset
+                .as_ref()
+                .unwrap_or(&DEFAULT_CHARSET.to_string())
+                .as_bytes(),
+        ) {
+            let (decoded, _, _) = encoding.decode(&self.data);
+            decoded.to_string()
+        } else {
+            "".to_string()
+        }
+    }
+
+    // TODO
+    // pub fn set_text(&self, Option<String>) {
+    // }
+
+    pub fn set_data(&mut self, new_data: &[u8]) {
+        self.data = new_data.to_vec();
+    }
+
+    pub fn get_fragment(&self) -> Option<String> {
+        if let Some(f) = &self.fragment {
+            Some(f.to_string())
+        } else {
+            None
+        }
+    }
+
+    pub fn set_fragment(&mut self, new_fragment: Option<String>) {
+        self.fragment = new_fragment;
+    }
+
+    // TODO: rename it to as_str/to_str, make it return a &str instead of String
+    // TODO: make it an Option(Result?), throw error in case is_base64_encoded=false, and charset!=default|utf8
     pub fn to_string(&self) -> String {
         let mut result: String = "data:".to_string();
 
@@ -140,7 +249,7 @@ impl DataUrl {
         }
 
         if let Some(c) = &self.charset {
-            // windows-1252 is same US-ASCII, the default one
+            // windows-1252 is another name for US-ASCII, the default charset in data URLs
             if c != "windows-1252" {
                 result += ";charset=";
                 result += &c;
@@ -176,111 +285,5 @@ impl DataUrl {
         }
 
         result
-    }
-
-    pub fn media_type(&self) -> &str {
-        if let Some(mt) = &self.media_type {
-            mt
-        } else {
-            DEFAULT_MEDIA_TYPE
-        }
-    }
-
-    pub fn media_type_no_default(&self) -> Option<String> {
-        if let Some(mt) = &self.media_type {
-            Some(mt.to_string())
-        } else {
-            None
-        }
-    }
-
-    pub fn set_media_type(&mut self, new_media_type: Option<String>) {
-        if let Some(mt) = new_media_type {
-            if mt.trim().len() > 0 {
-                self.media_type = Some(mt.to_string());
-            } else {
-                // Empty media type makes it fall back to default (text/plain)
-                self.media_type = None;
-            }
-        } else {
-            self.media_type = None;
-        }
-    }
-
-    pub fn charset(&self) -> &str {
-        if let Some(c) = &self.charset {
-            c
-        } else {
-            DEFAULT_CHARSET
-        }
-    }
-
-    pub fn charset_no_default(&self) -> Option<String> {
-        if let Some(c) = &self.charset {
-            Some(c.to_string())
-        } else {
-            None
-        }
-    }
-
-    pub fn set_charset(&mut self, new_charset: Option<String>) {
-        if let Some(c) = new_charset {
-            // Validate the input
-            if let Some(e) = Encoding::for_label_no_replacement(c.as_bytes()) {
-                self.charset = Some(e.name().to_string());
-            } else {
-                // Since browsers fall back to US-ASCII, so do we
-                self.charset = None;
-            }
-        } else {
-            self.charset = None;
-        }
-    }
-
-    pub fn is_base64_encoded(&self) -> bool {
-        self.is_base64_encoded
-    }
-
-    pub fn set_is_base64_encoded(&mut self, new_is_base64_encoded: bool) {
-        self.is_base64_encoded = new_is_base64_encoded;
-    }
-
-    pub fn data(&self) -> &[u8] {
-        &self.data
-    }
-
-    pub fn text(&self) -> String {
-        // This can never really fail
-        if let Some(encoding) = Encoding::for_label(
-            self.charset
-                .as_ref()
-                .unwrap_or(&DEFAULT_CHARSET.to_string())
-                .as_bytes(),
-        ) {
-            let (decoded, _, _) = encoding.decode(&self.data);
-            decoded.to_string()
-        } else {
-            "".to_string()
-        }
-    }
-
-    // TODO
-    // pub fn set_text(&self, Option<String>) {
-    // }
-
-    pub fn set_data(&mut self, new_data: &[u8]) {
-        self.data = new_data.to_vec();
-    }
-
-    pub fn fragment(&self) -> Option<String> {
-        if let Some(f) = &self.fragment {
-            Some(f.to_string())
-        } else {
-            None
-        }
-    }
-
-    pub fn set_fragment(&mut self, new_fragment: Option<String>) {
-        self.fragment = new_fragment;
     }
 }

@@ -13,7 +13,7 @@ mod passing {
     fn must_be_text_plain_by_default() -> Result<(), DataUrlParseError> {
         let data_url = DataUrl::new();
 
-        assert_eq!(data_url.media_type(), "text/plain");
+        assert_eq!(data_url.get_media_type(), "text/plain");
 
         Ok(())
     }
@@ -24,7 +24,7 @@ mod passing {
 
         data_url.set_media_type(Some("image/png".to_string()));
 
-        assert_eq!(data_url.media_type(), "image/png");
+        assert_eq!(data_url.get_media_type(), "image/png");
 
         Ok(())
     }
@@ -47,7 +47,7 @@ mod failing {
 
         data_url.set_media_type(Some("".to_string()));
 
-        assert_eq!(data_url.media_type(), "text/plain");
+        assert_eq!(data_url.get_media_type(), "text/plain");
 
         Ok(())
     }
@@ -59,7 +59,7 @@ mod failing {
 
         data_url.set_media_type(Some(" ".to_string()));
 
-        assert_eq!(data_url.media_type(), "text/plain");
+        assert_eq!(data_url.get_media_type(), "text/plain");
 
         Ok(())
     }
@@ -70,7 +70,7 @@ mod failing {
 
     //     data_url.set_media_type(Some("bad".to_string()));
 
-    //     assert_eq!(data_url.media_type(), "text/plain");
+    //     assert_eq!(data_url.get_media_type(), "text/plain");
 
     //     Ok(())
     // }
