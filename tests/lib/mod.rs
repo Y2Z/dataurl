@@ -9,6 +9,7 @@ mod fragment;
 mod media_type;
 mod media_type_no_default;
 mod text;
+mod to_string;
 
 // Misc.
-mod to_string;
+mod _misc_;
