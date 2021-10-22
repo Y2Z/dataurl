@@ -69,21 +69,23 @@ fn main() {
         app.value_of("INPUT").unwrap().to_string()
     } else if app.is_present("input-file") {
         fs::read_to_string(app.value_of("input-file").unwrap())
-            .expect("Something went wrong reading the file")
+            .expect("Something went wrong while trying to read the file")
     } else {
         eprintln!("no input provided");
         "".to_string()
     };
 
     if is_in_decode_mode {
-        match DataUrl::parse(&input) {
+        std::process::exit(match DataUrl::parse(&input) {
             Ok(data_url) => {
                 println!("{}", String::from_utf8_lossy(data_url.get_data()));
+                0
             }
-            Err(_data_url_parse_err) => {
-                eprintln!("parsing error");
+            Err(err) => {
+                eprintln!("error: {:?}", err);
+                1
             }
-        }
+        });
     } else {
         let mut data_url = DataUrl::new();
         data_url.set_data(input.as_bytes());
@@ -100,5 +102,6 @@ fn main() {
             data_url.set_fragment(Some(app.value_of("fragment").unwrap().to_string()));
         }
         println!("{}", data_url.to_string());
+        std::process::exit(0);
     }
 }

@@ -6,13 +6,13 @@ use url::Url;
 const DEFAULT_MEDIA_TYPE: &'static str = "text/plain";
 const DEFAULT_CHARSET: &'static str = "US-ASCII";
 
+// TODO: add support for other optional parameters besides charset (filename, etc)
 pub struct DataUrl {
     media_type: Option<String>, // Mime type
     charset: Option<String>,    // US-ASCII is default, according to the spec
     is_base64_encoded: bool,    // Indicates if it's a base64-encoded data URL
     data: Vec<u8>,              // Data, bytes
     fragment: Option<String>,   // #something-at-the-end, None by default
-                                // TODO: add support for other optional parameters besides charset (filename, etc)
 }
 
 pub enum DataUrlParseError {
@@ -41,8 +41,8 @@ fn parse_data_url_meta_data(meta_data_string: String) -> (Option<String>, Option
     let content_type_items: Vec<&str> = meta_data_string.split(';').collect();
     let mut i: i8 = 0;
     for item in &content_type_items {
+        // Media type has to always come first in data URLs
         if i == 0 {
-            // TODO: properly validte media type
             if item.trim().len() > 0 && validate_media_type(item) {
                 media_type = Some(item.trim().to_lowercase().to_string());
             }
@@ -191,6 +191,9 @@ impl DataUrl {
             self.charset = None;
         }
     }
+
+    // TODO: ditch get/set_is_base64_encode and implement two separate functions, to_precent_encoded_string, and to_base64_encoded_string?
+    // TODO: ^ if taken that path, should was_input_base64_encoded() added, None by default, Option<bool> after parse() is used, added?
 
     pub fn get_is_base64_encoded(&self) -> bool {
         self.is_base64_encoded
