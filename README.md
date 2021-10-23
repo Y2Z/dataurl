@@ -104,8 +104,8 @@ cat file.png | dataurl
 
 ## References
 
- - https://datatracker.ietf.org/doc/html/rfc2397
- - https://datatracker.ietf.org/doc/html/rfc6838
+ - [RFC 2397, The "data" URL scheme](https://datatracker.ietf.org/doc/html/rfc2397)
+ - [RFC 6838, Media Type Specifications and Registration Procedures](https://datatracker.ietf.org/doc/html/rfc6838)
 
 
 ---------------------------------------------------
