@@ -50,7 +50,7 @@ fn main() {
         )
         .arg(
             Arg::with_name("media_type")
-                .short("m")
+                .short("t")
                 .long("media-type")
                 .multiple(false)
                 .takes_value(true)

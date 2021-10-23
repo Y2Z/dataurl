@@ -70,7 +70,7 @@ mod passing {
     #[test]
     fn must_support_setting_media_type() {
         let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
-        let assert = cmd.arg("-b").arg("-m").arg("text/html").arg(" ").assert();
+        let assert = cmd.arg("-b").arg("-t").arg("text/html").arg(" ").assert();
 
         assert
             // Exit code must be 0
@@ -153,7 +153,7 @@ mod failing {
     #[test]
     fn must_not_allow_incorrect_media_type_to_be_set() {
         let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
-        let assert = cmd.arg("-m").arg("wrong/media/type").arg("Ü").assert();
+        let assert = cmd.arg("-t").arg("wrong/media/type").arg("Ü").assert();
 
         assert
             // Exit code must be 1

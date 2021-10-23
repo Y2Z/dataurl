@@ -96,7 +96,7 @@ cat file.png | dataurl
  - `-c`: Use custom `charset`
  - `-f`: Append `fragment`
  - `-i`: Specify `file` to read data from (use `-` for STDIN)
- - `-m`: Adjust `media type`
+ - `-t`: Adjust `media type`
 
 
 ---------------------------------------------------
