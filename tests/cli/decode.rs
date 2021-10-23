@@ -64,7 +64,7 @@ mod failing {
             // Exit code must be 1
             .failure()
             // STDERR must contain error message
-            .stderr("Error: DataUrlParseError.\n")
+            .stderr("error: DataUrlParseError\n")
             // STDOUT must be empty
             .stdout("");
     }

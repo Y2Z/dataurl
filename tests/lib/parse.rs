@@ -234,7 +234,7 @@ mod failing {
         assert_eq!(data_url.get_fragment(), None);
         assert_eq!(data_url.get_text(), "Ãœ");
         // Different from the original her because we needed to encode "Ãœ" as US-ASCII, which is 4 bytes
-        assert_eq!(data_url.to_string(), "data:text/css;base64,w4PFkw==");
+        assert_eq!(data_url.to_string(), "data:text/css;base64,w5w=");
         data_url.set_charset(Some("utf-8".to_string()));
         // And now it should be fine
         assert_eq!(

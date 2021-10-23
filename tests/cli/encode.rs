@@ -70,7 +70,7 @@ mod passing {
     #[test]
     fn must_support_setting_media_type() {
         let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
-        let assert = cmd.arg("-b").arg(" ").arg("-t").arg("text/html").assert();
+        let assert = cmd.arg("-b").arg("-m").arg("text/html").arg(" ").assert();
 
         assert
             // Exit code must be 0
@@ -84,7 +84,7 @@ mod passing {
     #[test]
     fn must_support_setting_charset() {
         let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
-        let assert = cmd.arg("-b").arg(" ").arg("-c").arg("utf8").assert();
+        let assert = cmd.arg("-b").arg("-c").arg("utf8").arg(" ").assert();
 
         assert
             // Exit code must be 0
@@ -98,7 +98,7 @@ mod passing {
     #[test]
     fn must_set_fragment_if_provided() {
         let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
-        let assert = cmd.arg("-b").arg(" ").arg("-f").arg("something").assert();
+        let assert = cmd.arg("-b").arg("-f").arg("something").arg(" ").assert();
 
         assert
             // Exit code must be 0
@@ -112,7 +112,7 @@ mod passing {
     #[test]
     fn must_set_empty_fragment_if_provided() {
         let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
-        let assert = cmd.arg("-b").arg(" ").arg("-f").arg("").assert();
+        let assert = cmd.arg("-b").arg("-f").arg("").arg(" ").assert();
 
         assert
             // Exit code must be 0
@@ -121,6 +121,20 @@ mod passing {
             .stderr("")
             // STDOUT must contain generated data URL
             .stdout("data:;base64,IA==#\n");
+    }
+
+    #[test]
+    fn must_support_gbk_encoded_data_urls() {
+        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+        let assert = cmd.arg("-c").arg("gbk").arg("Ü").assert();
+
+        assert
+            // Exit code must be 0
+            .success()
+            // STDERR must be completely empty
+            .stderr("")
+            // STDOUT must contain properly encoded data URL
+            .stdout("data:;charset=GBK,%26%23220%3B\n");
     }
 }
 
@@ -139,17 +153,13 @@ mod failing {
     #[test]
     fn must_not_allow_incorrect_media_type_to_be_set() {
         let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
-        let assert = cmd
-            .arg("-t")
-            .arg("wrong/media/type")
-            .arg("something")
-            .assert();
+        let assert = cmd.arg("-m").arg("wrong/media/type").arg("Ü").assert();
 
         assert
             // Exit code must be 1
             .failure()
             // STDERR must contain error message
-            .stderr("Error: invalid media type wrong/media/type.\n")
+            .stderr("error: Invalid media type 'wrong/media/type'\n")
             // STDOUT must be empty
             .stdout("");
     }
@@ -157,13 +167,13 @@ mod failing {
     #[test]
     fn must_not_allow_incorrect_charset_to_be_set() {
         let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
-        let assert = cmd.arg("-c").arg("BAD-CHARSET").arg("something").assert();
+        let assert = cmd.arg("-c").arg("BAD-CHARSET").arg("Ü").assert();
 
         assert
             // Exit code must be 1
             .failure()
             // STDERR must contain error message
-            .stderr("Error: invalid charset BAD-CHARSET.\n")
+            .stderr("error: Invalid charset 'BAD-CHARSET'\n")
             // STDOUT must be empty
             .stdout("");
     }

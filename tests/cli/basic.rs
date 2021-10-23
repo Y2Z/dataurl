@@ -34,7 +34,7 @@ OPTIONS:
     -i, --input-file <FILE>          Provides input file
     -c, --charset <charset>          Sets custom charset
     -f, --fragment <fragment>        Appends URL fragment
-    -t, --media-type <media_type>    Sets custom media type
+    -m, --media-type <media_type>    Sets custom media type
 
 ARGS:
     <INPUT>    Input string
@@ -99,11 +99,28 @@ mod failing {
 USAGE:
     {bin}{exe} [FLAGS] [OPTIONS] [INPUT]
 
-For more information try --help
-",
+For more information try --help\n",
                 bin = env!("CARGO_PKG_NAME"),
                 exe = if cfg!(windows) { ".exe" } else { "" }
             ))
+            // STDOUT must contain absolutely nothing
+            .stdout("");
+    }
+
+    #[test]
+    fn must_fail_when_both_file_and_argument_input_given() {
+        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+        let assert = cmd
+            .arg("-i")
+            .arg("_data_/text-file.txt")
+            .arg("text")
+            .assert();
+
+        assert
+            // Exit code must be 1
+            .failure()
+            // STDERR must contain error message
+            .stderr("error: Both file and argument inputs provided\n")
             // STDOUT must contain absolutely nothing
             .stdout("");
     }

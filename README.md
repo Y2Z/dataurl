@@ -4,7 +4,7 @@
 
 # dataurl
 
-CLI tool and Rust crate for converting files into data URLs and back
+CLI tool / Rust crate for converting files and text into data URLs and back
 
 
 ---------------------------------------------------
@@ -68,9 +68,9 @@ assert_eq!(data_url.get_text(), "Hello, World!");
 ```console
 dataurl "some text"
 ```
-
+val#f' > index.html
 ```console
-dataurl -d 'data:text/html,text...<p><a name%3D"bottom">bottom</a>?arg=val#f' > index.html
+dataurl -d 'data:text/html,text<a id%3D"b">ok</a>?a=v#f' > index.html
 ```
 
 ```console
@@ -88,14 +88,15 @@ cat file.png | dataurl
 ---------------------------------------------------
 
 
-## Options
+## Flags and options
 
- - `-b`: Prefer to use base64 even when not necessary
- - `-c`: Use custom `charset` (automatically sets `-b` if not `US-ASCII` or `windows-1252`)
+ - `-b`: Encode data using base64
  - `-d`: Attempt to parse input, output resulting data
- - `-f`: Append custom `fragment`
- - `-i`: Path to `file` to treat as input (use `-` for STDIN)
- - `-t`: Adjust `media type`
+
+ - `-c`: Use custom `charset`
+ - `-f`: Append `fragment`
+ - `-i`: Specify `file` to read data from (use `-` for STDIN)
+ - `-m`: Adjust `media type`
 
 
 ---------------------------------------------------
