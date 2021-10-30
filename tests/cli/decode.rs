@@ -11,34 +11,39 @@ mod passing {
     use std::process::Command;
 
     #[test]
-    fn must_parse_empty_data_url_arg_input_and_output_nothing_into_stdout_but_a_newline() {
+    fn must_parse_empty_data_url_arg_input_and_output_nothing_into_stdout() {
         let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
         let assert = cmd.arg("-d").arg("data:,").assert();
 
         assert
             // Exit code must be 0
             .success()
-            // STDERR must be completely empty
+            // STDERR must be empty
             .stderr("")
-            // STDOUT must contain nothing but a newline
-            .stdout("\n");
+            // STDOUT must be empty
+            .stdout("");
     }
 
     #[test]
     fn must_properly_parse_and_output_gbk_encoded_data_urls() {
         let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
-        let assert = cmd
+        let out = cmd
             .arg("-d")
             .arg("data:;charset=gbk;base64,PbnjtqvKocnu29rK0LGmsLI=")
-            .assert();
+            .output()
+            .unwrap();
 
-        assert
-            // Exit code must be 0
-            .success()
-            // STDERR must be completely empty
-            .stderr("")
-            // STDOUT must contain nothing but a newline
-            .stdout("=广东省深圳市宝安\n");
+        // STDOUT should contain newly added base URL
+        assert_eq!(
+            &out.stdout,
+            &[61, 185, 227, 182, 171, 202, 161, 201, 238, 219, 218, 202, 208, 177, 166, 176, 178]
+        );
+
+        // STDERR should be empty
+        assert_eq!(&out.stderr, &[]);
+
+        // Exit code should be 0
+        out.assert().code(0);
     }
 }
 
