@@ -173,7 +173,7 @@ mod failing {
             // Exit code must be 1
             .failure()
             // STDERR must contain error message
-            .stderr("error: Invalid charset 'BAD-CHARSET'\n")
+            .stderr("error: Invalid encoding 'BAD-CHARSET'\n")
             // STDOUT must be empty
             .stdout("");
     }

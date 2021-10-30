@@ -41,6 +41,31 @@ Every release contains pre-built binaries for Windows, GNU/Linux, as well as pla
 ---------------------------------------------------
 
 
+## Usage (CLI)
+
+```console
+dataurl "some text"
+```
+
+```console
+dataurl -d 'data:text/html,text<a id%3D"b">ok</a>?a=v#f' > index.html
+```
+
+```console
+dataurl -i picture.png
+```
+
+```console
+cat file.txt | dataurl -i -
+```
+
+```console
+cat file.png | dataurl
+```
+
+---------------------------------------------------
+
+
 ## Usage (crate)
 
 ```rust
@@ -63,31 +88,6 @@ assert_eq!(data_url.get_text(), "Hello, World!");
 ---------------------------------------------------
 
 
-## Usage (CLI)
-
-```console
-dataurl "some text"
-```
-val#f' > index.html
-```console
-dataurl -d 'data:text/html,text<a id%3D"b">ok</a>?a=v#f' > index.html
-```
-
-```console
-dataurl -i picture.png
-```
-
-```console
-cat file.txt | dataurl -i -
-```
-
-```console
-cat file.png | dataurl
-```
-
----------------------------------------------------
-
-
 ## Flags and options
 
  - `-b`: Encode data using base64
@@ -104,8 +104,8 @@ cat file.png | dataurl
 
 ## References
 
- - [RFC 2397, The "data" URL scheme](https://datatracker.ietf.org/doc/html/rfc2397)
- - [RFC 6838, Media Type Specifications and Registration Procedures](https://datatracker.ietf.org/doc/html/rfc6838)
+ - [RFC 2397 (The "data" URL scheme)](https://datatracker.ietf.org/doc/html/rfc2397)
+ - [RFC 6838 (Media Type Specifications and Registration Procedures)](https://datatracker.ietf.org/doc/html/rfc6838)
 
 
 ---------------------------------------------------

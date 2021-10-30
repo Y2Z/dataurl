@@ -5,13 +5,35 @@ use url::Url;
 
 const DEFAULT_MEDIA_TYPE: &'static str = "text/plain";
 const DEFAULT_CHARSET: &'static str = "US-ASCII";
+const TEXTUAL_MEDIA_TYPES: &'static [&str] = &[
+    "application/atom+xml",
+    "application/dart",
+    "application/ecmascript",
+    "application/javascript",
+    "application/json",
+    "application/jwt",
+    "application/rdf+xml",
+    "application/rss+xml",
+    "application/soap+xml",
+    "application/vnd.mozilla.xul+xml",
+    "application/x-javascript",
+    "application/x-yaml",
+    "application/xhtml+xml",
+    "application/xml",
+    "application/xml-dtd",
+    "application/xop+xml",
+    "application/yaml",
+    "image/svg+xml",
+    "message/imdn+xml",
+    "model/x3d+xml",
+];
 
 // TODO: add support for other optional parameters besides charset (filename, etc)
 pub struct DataUrl {
     media_type: Option<String>, // Media type
     charset: Option<String>,    // US-ASCII is default, according to the spec
     is_base64_encoded: bool,    // Indicates if it's a base64-encoded data URL
-    data: Vec<u8>,              // Data, bytes, always UTF-8
+    data: Vec<u8>,              // Data, bytes, UTF-8 if text
     fragment: Option<String>,   // #something-at-the-end, None by default
 }
 
@@ -25,11 +47,6 @@ impl fmt::Debug for DataUrlParseError {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         fmt.debug_struct("DataUrlParseError").finish()
     }
-}
-
-pub(crate) fn validate_media_type(input: &str) -> bool {
-    // Must contain one slash
-    input.split('/').collect::<Vec<&str>>().len() == 2
 }
 
 pub(crate) fn parse_data_url_meta_data(
@@ -67,6 +84,11 @@ pub(crate) fn parse_data_url_meta_data(
     (media_type, charset, is_base64_encoded)
 }
 
+pub(crate) fn validate_media_type(media_type: &str) -> bool {
+    // Must contain one slash
+    media_type.split('/').collect::<Vec<&str>>().len() == 2
+}
+
 impl DataUrl {
     pub fn new() -> DataUrl {
         DataUrl {
@@ -92,16 +114,14 @@ impl DataUrl {
                         parse_data_url_meta_data(meta_data_string);
 
                     // Parse raw data into vector of bytes
-                    let mut data_string: String = percent_decode_str(&path[comma_offset + 1..])
-                        .decode_utf8_lossy()
-                        .to_string();
+                    let mut d: Vec<u8> = percent_decode_str(&path[comma_offset + 1..]).collect();
                     if let Some(query) = url.query() {
-                        data_string += "?";
-                        data_string += &percent_decode_str(&query).decode_utf8_lossy().to_string();
+                        d.push("?".as_bytes()[0]);
+                        d.append(&mut percent_decode_str(&query).collect());
                     }
                     let mut unable_to_decode_base64: bool = false;
                     let blob: Vec<u8> = if is_base64_encoded {
-                        match base64::decode(&data_string) {
+                        match base64::decode(&d) {
                             Ok(decoded) => decoded,
                             Err(_) => {
                                 unable_to_decode_base64 = true;
@@ -109,7 +129,7 @@ impl DataUrl {
                             }
                         }
                     } else {
-                        data_string.as_bytes().to_vec()
+                        d
                     };
 
                     if unable_to_decode_base64 {
@@ -133,6 +153,26 @@ impl DataUrl {
             }
             Err(_) => Err(DataUrlParseError::UrlParseError),
         }
+    }
+
+    pub fn is_binary(&self) -> bool {
+        if self.media_type.is_none() {
+            return false;
+        }
+
+        let current_media_type: &str = &self.media_type.as_ref().unwrap();
+        let is_textual: bool = if current_media_type.split('/').collect::<Vec<&str>>()[0]
+            .eq_ignore_ascii_case("text")
+        {
+            true
+        } else {
+            TEXTUAL_MEDIA_TYPES
+                .iter()
+                .find(|mt| current_media_type.eq_ignore_ascii_case(mt))
+                .is_some()
+        };
+
+        !is_textual
     }
 
     pub fn get_media_type(&self) -> &str {
@@ -184,59 +224,21 @@ impl DataUrl {
     }
 
     pub fn set_charset(&mut self, new_charset: Option<String>) -> bool {
-        let c: Option<String>;
-        let success;
-
         if let Some(nc) = new_charset {
             // Validate the input
             if let Some(e) = Encoding::for_label_no_replacement(nc.as_bytes()) {
-                c = Some(e.name().to_string());
-                success = true;
+                self.charset = Some(e.name().to_string());
+                true
             } else {
                 // Since browsers fall back to US-ASCII, so does this
-                c = None;
-                success = false;
+                self.charset = None;
+                false
             }
         } else {
             // Unset
-            c = None;
-            success = true;
+            self.charset = None;
+            true
         }
-
-        /*
-        // Check if already has the same charset
-        if self.charset != c {
-            if self.data.len() > 0 {
-                // Re-encode existing data from old charset into new one
-                // Can be lossy if not careful
-
-                // 1. Decode our current data into UTF-8 (if needed)
-                if self.charset.is_some()
-                    && self.charset != Some("US-ASCII".to_string())
-                    && self.charset != Some("windows-1252".to_string())
-                    && self.charset != Some("UTF-8".to_string())
-                {
-                    if let Some(encoding) = Encoding::for_label_no_replacement(self.charset.as_ref().unwrap().as_bytes()) {
-                        let (decoded, _, _) = encoding.decode(&self.data);
-                        self.data = decoded.as_bytes().to_vec();
-                    }
-                }
-
-                // 2. Encode our UTF-8 data into whatever encoding it's now set to have
-                if let Some(encoding) = Encoding::for_label_no_replacement(c.clone().unwrap().as_bytes()) {
-                    let input = &String::from_utf8_lossy(&self.data);
-                    let (encoded, _, _) = encoding.encode(input);
-                    self.data = encoded.to_vec();
-                }
-            }
-
-            self.charset = c;
-        }
-        */
-
-        self.charset = c;
-
-        success
     }
 
     // TODO: ditch get/set_is_base64_encode and implement two separate functions, to_precent_encoded_string, and to_base64_encoded_string?
@@ -314,7 +316,7 @@ impl DataUrl {
         }
 
         if let Some(c) = &self.charset {
-            // windows-1252 is another name for US-ASCII, the default charset in data URLs
+            // windows-1252 is another name for US-ASCII, the default charset for data URLs
             if c != "windows-1252" {
                 result += ";charset=";
                 result += &c;
@@ -328,25 +330,37 @@ impl DataUrl {
             result += ",";
 
             if self.data.len() > 0 {
-                let data_as_utf8_string: String = String::from_utf8_lossy(&self.data).to_string();
-                let fallback_charset: String = if data_as_utf8_string.is_ascii() {
-                    DEFAULT_CHARSET.to_string()
-                } else {
-                    "UTF-8".to_string()
-                };
-
-                if let Some(encoding) = Encoding::for_label_no_replacement(
-                    self.charset
-                        .as_ref()
-                        .unwrap_or(&fallback_charset)
-                        .as_bytes(),
-                ) {
-                    let (encoded, _, _) = encoding.encode(&data_as_utf8_string);
-
+                if self.is_binary() {
+                    // Just encode as base64 or URI if data is binary
                     if self.is_base64_encoded {
-                        result += &base64::encode(&encoded.to_vec());
+                        result += &base64::encode(&self.data);
                     } else {
-                        result += &percent_encode(&encoded.to_vec(), NON_ALPHANUMERIC).to_string();
+                        result += &percent_encode(&self.data, NON_ALPHANUMERIC).to_string();
+                    }
+                } else {
+                    // Charset only matters for textual data
+                    let data_as_utf8_string: String =
+                        String::from_utf8_lossy(&self.data).to_string();
+                    let fallback_charset: String = if data_as_utf8_string.is_ascii() {
+                        DEFAULT_CHARSET.to_string()
+                    } else {
+                        "UTF-8".to_string()
+                    };
+
+                    if let Some(encoding) = Encoding::for_label_no_replacement(
+                        self.charset
+                            .as_ref()
+                            .unwrap_or(&fallback_charset)
+                            .as_bytes(),
+                    ) {
+                        let (encoded, _, _) = encoding.encode(&data_as_utf8_string);
+
+                        if self.is_base64_encoded {
+                            result += &base64::encode(&encoded.to_vec());
+                        } else {
+                            result +=
+                                &percent_encode(&encoded.to_vec(), NON_ALPHANUMERIC).to_string();
+                        }
                     }
                 }
             }
