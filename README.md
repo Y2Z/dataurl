@@ -10,37 +10,6 @@ CLI tool / Rust crate for converting files and text into data URLs and back
 ---------------------------------------------------
 
 
-## Installation
-
-#### Using [Cargo](https://crates.io/crates/dataurl)
-
-```console
-cargo install dataurl
-```
-
-#### Using [containers](https://www.docker.com/)
-
-```console
-docker build -t Y2Z/dataurl .
-sudo install -b dist/run-in-container.sh /usr/local/bin/dataurl
-```
-
-#### From source
-
-```console
-git clone https://github.com/Y2Z/dataurl.git
-cd dataurl
-make install
-```
-
-#### Using [pre-built binaries](https://github.com/Y2Z/dataurl/releases) (Windows, ARM-based devices, etc)
-
-Every release contains pre-built binaries for Windows, GNU/Linux, as well as platforms with non-standart CPU architecture.
-
-
----------------------------------------------------
-
-
 ## Usage (CLI)
 
 ```console
@@ -62,6 +31,17 @@ cat file.txt | dataurl -i - -o - | dataurl -d
 ```console
 cat file.png | dataurl
 ```
+
+### Flags and options
+
+ - `-b`: Encode data using base64
+ - `-c`: Use custom `charset`
+ - `-d`: Attempt to parse input, output resulting data
+ - `-f`: Append `fragment`
+ - `-i`: Specify `file` to read data from (use `-` for STDIN)
+ - `-o`: Provide `file` to write output to (use `-` for STDOUT)
+ - `-t`: Adjust `media type`
+
 
 ---------------------------------------------------
 
@@ -88,15 +68,32 @@ assert_eq!(data_url.get_text(), "Hello, World!");
 ---------------------------------------------------
 
 
-## Flags and options
+## Installation
 
- - `-b`: Encode data using base64
- - `-c`: Use custom `charset`
- - `-d`: Attempt to parse input, output resulting data
- - `-f`: Append `fragment`
- - `-i`: Specify `file` to read data from (use `-` for STDIN)
- - `-o`: Provide `file` to write output to (use `-` for STDOUT)
- - `-t`: Adjust `media type`
+#### Using [Cargo](https://crates.io/crates/dataurl)
+
+```console
+cargo install dataurl
+```
+
+#### Using [containers](https://www.docker.com/)
+
+```console
+docker build -t Y2Z/dataurl .
+sudo install -b dist/run-in-container.sh /usr/local/bin/dataurl
+```
+
+#### From source
+
+```console
+git clone https://github.com/Y2Z/dataurl.git
+cd dataurl
+make install
+```
+
+#### Using [pre-built binaries](https://github.com/Y2Z/dataurl/releases) (Windows, ARM-based devices, etc)
+
+Every release contains pre-built binaries for Windows, GNU/Linux, as well as platforms with non-standart CPU architecture.
 
 
 ---------------------------------------------------
