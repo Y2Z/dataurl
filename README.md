@@ -56,7 +56,7 @@ dataurl -i picture.png
 ```
 
 ```console
-cat file.txt | dataurl -i -
+cat file.txt | dataurl -i - -o - | dataurl -d
 ```
 
 ```console
@@ -91,11 +91,11 @@ assert_eq!(data_url.get_text(), "Hello, World!");
 ## Flags and options
 
  - `-b`: Encode data using base64
- - `-d`: Attempt to parse input, output resulting data
-
  - `-c`: Use custom `charset`
+ - `-d`: Attempt to parse input, output resulting data
  - `-f`: Append `fragment`
  - `-i`: Specify `file` to read data from (use `-` for STDIN)
+ - `-o`: Provides `file` to write output to (use `-` for STDOUT)
  - `-t`: Adjust `media type`
 
 
