@@ -95,7 +95,7 @@ assert_eq!(data_url.get_text(), "Hello, World!");
  - `-d`: Attempt to parse input, output resulting data
  - `-f`: Append `fragment`
  - `-i`: Specify `file` to read data from (use `-` for STDIN)
- - `-o`: Provides `file` to write output to (use `-` for STDOUT)
+ - `-o`: Provide `file` to write output to (use `-` for STDOUT)
  - `-t`: Adjust `media type`
 
 
