@@ -146,15 +146,15 @@ fn main() {
                     // Write raw bytes if the output is a file, or if the contents of this data URL has binary format
                     if file_output_set {
                         let mut handle = fs::File::create(output_file_path).unwrap();
-                        handle.write_all(data_url.get_data()).unwrap();
+                        handle.write_all(data_url.data()).unwrap();
                     } else {
                         let stdout = io::stdout();
                         let mut handle = stdout.lock();
-                        handle.write_all(data_url.get_data()).unwrap();
+                        handle.write_all(data_url.data()).unwrap();
                     }
                 } else {
                     // When printing the result directly into the terminal, we have to convert data into UTF-8 (must account for non-US-ASCII/UTF-8 charsets)
-                    print!("{}", data_url.get_text());
+                    print!("{}", data_url.text());
                 }
                 0
             }
@@ -180,6 +180,8 @@ fn main() {
                 eprintln!("error: Invalid encoding '{}'", charset);
                 std::process::exit(1);
             }
+
+            // TODO: encode data into provided charset, if different
         } else {
             // TODO: ideally the program needs to check the current terminal locale (encoding), and not just assume it's UTF-8
 

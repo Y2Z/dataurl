@@ -33,16 +33,16 @@ mod passing {
             .output()
             .unwrap();
 
-        // STDOUT should contain newly added base URL
+        // STDOUT must contain GBK characters
         assert_eq!(
             &out.stdout,
             &[61, 185, 227, 182, 171, 202, 161, 201, 238, 219, 218, 202, 208, 177, 166, 176, 178]
         );
 
-        // STDERR should be empty
+        // STDERR must be empty
         assert_eq!(&out.stderr, &[]);
 
-        // Exit code should be 0
+        // Exit code must be 0
         out.assert().code(0);
     }
 }

@@ -175,7 +175,7 @@ impl DataUrl {
         !is_textual
     }
 
-    pub fn get_media_type(&self) -> &str {
+    pub fn media_type(&self) -> &str {
         if let Some(mt) = &self.media_type {
             mt
         } else {
@@ -183,7 +183,7 @@ impl DataUrl {
         }
     }
 
-    pub fn get_media_type_no_default(&self) -> Option<String> {
+    pub fn media_type_no_default(&self) -> Option<String> {
         if let Some(mt) = &self.media_type {
             Some(mt.to_string())
         } else {
@@ -207,7 +207,7 @@ impl DataUrl {
         }
     }
 
-    pub fn get_charset(&self) -> &str {
+    pub fn charset(&self) -> &str {
         if let Some(c) = &self.charset {
             c
         } else {
@@ -215,7 +215,7 @@ impl DataUrl {
         }
     }
 
-    pub fn get_charset_no_default(&self) -> Option<String> {
+    pub fn charset_no_default(&self) -> Option<String> {
         if let Some(c) = &self.charset {
             Some(c.to_string())
         } else {
@@ -244,7 +244,7 @@ impl DataUrl {
     // TODO: ditch get/set_is_base64_encode and implement two separate functions, to_precent_encoded_string, and to_base64_encoded_string?
     // TODO: ^ if taken that path, should was_input_base64_encoded() added, None by default, Option<bool> after parse() is used, added?
 
-    pub fn get_is_base64_encoded(&self) -> bool {
+    pub fn is_base64_encoded(&self) -> bool {
         self.is_base64_encoded
     }
 
@@ -252,11 +252,11 @@ impl DataUrl {
         self.is_base64_encoded = new_is_base64_encoded;
     }
 
-    pub fn get_data(&self) -> &[u8] {
+    pub fn data(&self) -> &[u8] {
         &self.data
     }
 
-    pub fn get_text(&self) -> String {
+    pub fn text(&self) -> String {
         // This can never really fail
         if let Some(encoding) = Encoding::for_label_no_replacement(
             self.charset
@@ -294,7 +294,7 @@ impl DataUrl {
         self.data = new_data.to_vec();
     }
 
-    pub fn get_fragment(&self) -> Option<String> {
+    pub fn fragment(&self) -> Option<String> {
         if let Some(f) = &self.fragment {
             Some(f.to_string())
         } else {
