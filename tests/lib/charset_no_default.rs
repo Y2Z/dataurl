@@ -13,7 +13,7 @@ mod passing {
     fn must_be_us_none_by_default() -> Result<(), DataUrlParseError> {
         let data_url = DataUrl::new();
 
-        assert_eq!(data_url.get_charset_no_default(), None);
+        assert_eq!(data_url.charset_no_default(), None);
 
         Ok(())
     }
@@ -24,7 +24,7 @@ mod passing {
 
         assert!(data_url.set_charset(Some("utf8".to_string())));
 
-        assert_eq!(data_url.get_charset_no_default(), Some("UTF-8".to_string()));
+        assert_eq!(data_url.charset_no_default(), Some("UTF-8".to_string()));
 
         Ok(())
     }
@@ -48,7 +48,7 @@ mod failing {
         // This bad input must make it fall back to US-ASCII
         assert!(!data_url.set_charset(Some("BAD-CHARSET".to_string())));
 
-        assert_eq!(data_url.get_charset_no_default(), None);
+        assert_eq!(data_url.charset_no_default(), None);
 
         Ok(())
     }
