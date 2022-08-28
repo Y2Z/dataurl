@@ -20,10 +20,18 @@ license = "CC0-1.0"
 [dependencies]
 atty = "0.2.14"
 base64 = "0.13.0"
-clap = "2.33.3"
+clap = { version = "2.33.3", optional = true } 
 encoding_rs = "0.8.29"
 percent-encoding = "2.1.0"
 url = "2.2.2"
 
 [dev-dependencies]
 assert_cmd = "2.0.2"
+
+[features]
+default = ["cli"]
+cli = ["clap"]
+
+[[bin]]
+name = "dataurl"
+required-features = ["cli"]
