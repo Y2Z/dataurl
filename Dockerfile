@@ -8,7 +8,9 @@ RUN tar xfz dataurl.tar.gz \
     && rm dataurl.tar.gz
 
 WORKDIR dataurl/
+
 RUN make install
+
 
 
 FROM alpine
@@ -18,5 +20,7 @@ RUN apk update && \
   rm -rf "/var/cache/apk/*"
 
 COPY --from=builder /home/rust/.cargo/bin/dataurl /usr/bin/dataurl
+
 WORKDIR /tmp
+
 ENTRYPOINT ["/usr/bin/dataurl"]
