@@ -5,7 +5,30 @@ use url::Url;
 
 const DEFAULT_MEDIA_TYPE: &'static str = "text/plain";
 const DEFAULT_CHARSET: &'static str = "US-ASCII";
-const TEXTUAL_MEDIA_TYPES: &'static [&str] = &[
+const FILE_SIGNATURES: [[&[u8]; 2]; 18] = [
+    // Image
+    [b"GIF87a", b"image/gif"],
+    [b"GIF89a", b"image/gif"],
+    [b"\xFF\xD8\xFF", b"image/jpeg"],
+    [b"\x89PNG\x0D\x0A\x1A\x0A", b"image/png"],
+    [b"<svg ", b"image/svg+xml"],
+    [b"RIFF....WEBPVP8 ", b"image/webp"],
+    [b"\x00\x00\x01\x00", b"image/x-icon"],
+    // Audio
+    [b"ID3", b"audio/mpeg"],
+    [b"\xFF\x0E", b"audio/mpeg"],
+    [b"\xFF\x0F", b"audio/mpeg"],
+    [b"OggS", b"audio/ogg"],
+    [b"RIFF....WAVEfmt ", b"audio/wav"],
+    [b"fLaC", b"audio/x-flac"],
+    // Video
+    [b"RIFF....AVI LIST", b"video/avi"],
+    [b"....ftyp", b"video/mp4"],
+    [b"\x00\x00\x01\x0B", b"video/mpeg"],
+    [b"....moov", b"video/quicktime"],
+    [b"\x1A\x45\xDF\xA3", b"video/webm"],
+];
+const PLAINTEXT_MEDIA_TYPES: &'static [&str] = &[
     "application/atom+xml",
     "application/dart",
     "application/ecmascript",
@@ -34,7 +57,7 @@ pub struct DataUrl {
     charset: Option<String>,    // US-ASCII is default, according to the spec
     is_base64_encoded: bool,    // Indicates if it's a base64-encoded data URL
     data: Vec<u8>,              // Data, bytes, UTF-8 if text
-    fragment: Option<String>,   // #something-at-the-end, None by default
+    fragment: Option<String>,   // #something at the end, None by default
 }
 
 pub enum DataUrlParseError {
@@ -47,6 +70,58 @@ impl fmt::Debug for DataUrlParseError {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         fmt.debug_struct("DataUrlParseError").finish()
     }
+}
+
+pub fn detect_media_type(data: &[u8], filename: &str) -> String {
+    // At first attempt to read file's header
+    for file_signaure in FILE_SIGNATURES.iter() {
+        if data.starts_with(file_signaure[0]) {
+            return String::from_utf8(file_signaure[1].to_vec()).unwrap();
+        }
+    }
+
+    // If header didn't match any known magic signatures,
+    // try to guess media type from file name
+    detect_media_type_by_file_name(&filename)
+}
+
+pub fn detect_media_type_by_file_name(filename: &str) -> String {
+    let filename_lowercased: &str = &filename.to_lowercase();
+    let parts: Vec<&str> = filename_lowercased.split('.').collect();
+
+    let mime: &str = match parts.last() {
+        Some(v) => match *v {
+            "avi" => "video/avi",
+            "bmp" => "image/bmp",
+            "css" => "text/css",
+            "flac" => "audio/flac",
+            "gif" => "image/gif",
+            "htm" | "html" => "text/html",
+            "ico" => "image/x-icon",
+            "jpeg" | "jpg" => "image/jpeg",
+            "js" => "application/javascript",
+            "json" => "application/json",
+            "mp3" => "audio/mpeg",
+            "mp4" | "m4v" => "video/mp4",
+            "ogg" => "audio/ogg",
+            "ogv" => "video/ogg",
+            "pdf" => "application/pdf",
+            "png" => "image/png",
+            "svg" => "image/svg+xml",
+            "swf" => "application/x-shockwave-flash",
+            "tif" | "tiff" => "image/tiff",
+            "txt" => "text/plain",
+            "wav" => "audio/wav",
+            "webp" => "image/webp",
+            "woff" => "font/woff",
+            "woff2" => "font/woff2",
+            "xml" => "text/xml",
+            &_ => "",
+        },
+        None => "",
+    };
+
+    mime.to_string()
 }
 
 pub(crate) fn parse_data_url_meta_data(
@@ -85,7 +160,7 @@ pub(crate) fn parse_data_url_meta_data(
 }
 
 pub(crate) fn validate_media_type(media_type: &str) -> bool {
-    // Must contain one slash
+    // Must contain one forward slash
     media_type.split('/').collect::<Vec<&str>>().len() == 2
 }
 
@@ -161,18 +236,18 @@ impl DataUrl {
         }
 
         let current_media_type: &str = &self.media_type.as_ref().unwrap();
-        let is_textual: bool = if current_media_type.split('/').collect::<Vec<&str>>()[0]
+        let is_plaintext: bool = if current_media_type.split('/').collect::<Vec<&str>>()[0]
             .eq_ignore_ascii_case("text")
         {
             true
         } else {
-            TEXTUAL_MEDIA_TYPES
+            PLAINTEXT_MEDIA_TYPES
                 .iter()
                 .find(|mt| current_media_type.eq_ignore_ascii_case(mt))
                 .is_some()
         };
 
-        !is_textual
+        !is_plaintext
     }
 
     pub fn media_type(&self) -> &str {
@@ -316,7 +391,7 @@ impl DataUrl {
         }
 
         if let Some(c) = &self.charset {
-            // windows-1252 is another name for US-ASCII, the default charset for data URLs
+            // NOTE: windows-1252 is another name for US-ASCII, the default charset for data URLs
             if c != "windows-1252" {
                 result += ";charset=";
                 result += &c;
