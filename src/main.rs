@@ -80,48 +80,48 @@ fn main() {
 
     //////////////////////////////////////////////////////////////////////////
 
-    let decode_mode_enabled: bool = app.is_present("decode");
-    let string_input_set: bool = app.is_present("INPUT");
+    let is_decode_mode_enabled: bool = app.is_present("decode");
+    let is_string_input_set: bool = app.is_present("INPUT");
     // let stdin_is_a_tty: bool = !io::stdio::stdin_raw().isatty();
-    let stdout_is_a_tty: bool = atty::is(Stream::Stdout);
-    let mut file_input_set: bool = app.is_present("INPUT FILE");
-    let mut file_output_set: bool = app.is_present("OUTPUT FILE");
-    let input_file_path: &str = if file_input_set {
+    let is_stdout_a_tty: bool = atty::is(Stream::Stdout);
+    let mut is_file_input_set: bool = app.is_present("INPUT FILE");
+    let mut is_file_output_set: bool = app.is_present("OUTPUT FILE");
+    let input_file_path: &str = if is_file_input_set {
         app.value_of("INPUT FILE").unwrap()
     } else {
         "-"
     };
-    let output_file_path: &str = if file_output_set {
+    let output_file_path: &str = if is_file_output_set {
         app.value_of("OUTPUT FILE").unwrap()
     } else {
         "-"
     };
-    if file_input_set && input_file_path == "-" {
-        file_input_set = false;
+    if is_file_input_set && input_file_path == "-" {
+        is_file_input_set = false;
     }
-    if file_output_set && output_file_path == "-" {
-        file_output_set = false;
+    if is_file_output_set && output_file_path == "-" {
+        is_file_output_set = false;
     }
-    let file_input_set = file_input_set;
-    let file_output_set = file_output_set;
+    let is_file_input_set = is_file_input_set;
+    let is_file_output_set = is_file_output_set;
 
     //////////////////////////////////////////////////////////////////////////
 
-    if string_input_set && file_input_set {
+    if is_string_input_set && is_file_input_set {
         eprintln!("error: Both file and argument inputs provided");
         std::process::exit(1);
     }
 
-    if !stdout_is_a_tty && file_output_set {
+    if !is_stdout_a_tty && is_file_output_set {
         eprintln!("error: Both stdout and argument output provided");
         std::process::exit(1);
     }
 
     //////////////////////////////////////////////////////////////////////////
 
-    let input: Vec<u8> = if string_input_set {
+    let input: Vec<u8> = if is_string_input_set {
         app.value_of("INPUT").unwrap().as_bytes().to_vec()
-    } else if file_input_set {
+    } else if is_file_input_set {
         match fs::read(input_file_path) {
             Ok(input_file_data) => input_file_data,
             Err(_) => {
@@ -136,15 +136,19 @@ fn main() {
 
     //////////////////////////////////////////////////////////////////////////
 
-    if decode_mode_enabled {
+    if is_decode_mode_enabled {
+        ////////////
+        // Decode //
+        ////////////
+
         // TODO: ideally the program needs to check the current terminal locale (encoding), and not just assume it's UTF-8
         let input_as_string: String = String::from_utf8_lossy(&input).to_string();
 
         std::process::exit(match DataUrl::parse(&input_as_string) {
             Ok(data_url) => {
-                if !stdout_is_a_tty || file_output_set || data_url.is_binary() {
+                if !is_stdout_a_tty || is_file_output_set || data_url.is_binary() {
                     // Write raw bytes if the output is a file, or if the contents of this data URL has binary format
-                    if file_output_set {
+                    if is_file_output_set {
                         let mut handle = fs::File::create(output_file_path).unwrap();
                         handle.write_all(data_url.data()).unwrap();
                     } else {
@@ -164,6 +168,10 @@ fn main() {
             }
         });
     } else {
+        ////////////
+        // Encode //
+        ////////////
+
         let mut data_url = DataUrl::new();
 
         data_url.set_data(&input);
@@ -186,7 +194,7 @@ fn main() {
             // TODO: ideally the program needs to check the current terminal locale (encoding), and not just assume it's UTF-8
 
             // Automatically enforce ;charset=UTF-8 for non-ascii argument inputs
-            if string_input_set && !String::from_utf8_lossy(&input).to_string().is_ascii() {
+            if is_string_input_set && !String::from_utf8_lossy(&input).to_string().is_ascii() {
                 data_url.set_charset(Some("UTF-8".to_string()));
             }
         }
@@ -199,6 +207,16 @@ fn main() {
                 eprintln!("error: Invalid media type '{}'", media_type);
                 std::process::exit(1);
             }
+        } else {
+            if is_file_input_set {
+                if input_file_path.ends_with(".png") {
+                    data_url.set_media_type(Some("image/png".to_string()));
+                } else {
+                    data_url.set_media_type(Some("text/plain".to_string()));
+                }
+            }
+            // TODO: try to automatically detect file type from file name / header
+            // data_url.set_media_type(Some("text/TODO".to_string()));
         }
 
         if app.is_present("FRAGMENT") {
