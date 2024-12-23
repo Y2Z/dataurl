@@ -1,3 +1,4 @@
+use base64::{engine::general_purpose::URL_SAFE, Engine as _};
 use encoding_rs::Encoding;
 use percent_encoding::{percent_decode_str, percent_encode, utf8_percent_encode, NON_ALPHANUMERIC};
 use std::fmt;
@@ -121,7 +122,7 @@ impl DataUrl {
                     }
                     let mut unable_to_decode_base64: bool = false;
                     let blob: Vec<u8> = if is_base64_encoded {
-                        match base64::decode(&d) {
+                        match URL_SAFE.decode(&d) {
                             Ok(decoded) => decoded,
                             Err(_) => {
                                 unable_to_decode_base64 = true;
@@ -333,7 +334,7 @@ impl DataUrl {
                 if self.is_binary() {
                     // Just encode as base64 or URI if data is binary
                     if self.is_base64_encoded {
-                        result += &base64::encode(&self.data);
+                        result += &URL_SAFE.encode(&self.data);
                     } else {
                         result += &percent_encode(&self.data, NON_ALPHANUMERIC).to_string();
                     }
@@ -356,7 +357,7 @@ impl DataUrl {
                         let (encoded, _, _) = encoding.encode(&data_as_utf8_string);
 
                         if self.is_base64_encoded {
-                            result += &base64::encode(&encoded.to_vec());
+                            result += &URL_SAFE.encode(&encoded.to_vec());
                         } else {
                             result +=
                                 &percent_encode(&encoded.to_vec(), NON_ALPHANUMERIC).to_string();
