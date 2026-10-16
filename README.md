@@ -35,15 +35,31 @@ cat file.txt | dataurl -i - -o - | dataurl -d
 cat file.png | dataurl -b
 ```
 
+```console
+dataurl -s -m -i logo.svg -i photo.jpg -i font.woff2 > urls.txt
+```
+
+```console
+dataurl --size -i logo.svg -i photo.jpg
+```
+
+```console
+dataurl -d -O assets/ -i logo.txt -i photo.txt
+```
+
 ### Flags and options
 
  - `-b`: Encode data using base64
+ - `-s`: Use base64 or percent-encoding, whichever results in a shorter data URL
+ - `-m`: Only escape what has to be when percent-encoding (for data URLs that go inside double-quoted HTML attributes or CSS strings)
  - `-c`: Use custom `charset` (text given as an argument gets converted to it)
- - `-d`: Attempt to parse input, output resulting data
  - `-f`: Append `fragment`
- - `-i`: Specify `file` to read data from (use `-` for STDIN)
- - `-o`: Provide `file` to write output to (use `-` for STDOUT)
  - `-t`: Adjust `media type` (detected automatically for files and STDIN)
+ - `-i`: Specify `file` to read data from (use `-` for STDIN); can be given several times, for one data URL per line
+ - `-o`: Provide `file` to write output to (use `-` for STDOUT)
+ - `--size`: Print the lengths of the percent-encoded and base64-encoded data URLs instead, tab-separated, followed by the file name (if any)
+ - `-d`: Attempt to parse input, output resulting data
+ - `-O`: Decode into files in `directory`, named after the input files, with extensions matching their media types (the names written get printed)
 
 
 ---------------------------------------------------
@@ -134,6 +150,15 @@ use dataurl::detect_media_type;
 
 assert_eq!(detect_media_type(b"\x89PNG\r\n\x1a\n", None), Some("image/png"));
 assert_eq!(detect_media_type(b"body{}", Some("style.css")), Some("text/css"));
+```
+
+`extension_for_media_type()` goes the other way, e.g. for saving decoded data to files:
+
+```rust
+use dataurl::extension_for_media_type;
+
+assert_eq!(extension_for_media_type("image/svg+xml"), Some("svg"));
+assert_eq!(extension_for_media_type("application/javascript"), Some("js"));
 ```
 
 If all you need is parsing, [data-url](https://crates.io/crates/data-url) (from the Servo project) is another spec-compliant option;
