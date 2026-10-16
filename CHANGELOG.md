@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.2.1
+
+### Added
+
+ - `detect_media_type()`, which guesses the media type from the data's signature (using the
+   [infer](https://crates.io/crates/infer) crate), falling back to the file extension for text formats
+   like CSS and JavaScript, and recognizing SVG either way
+ - The CLI detects the media type of files and STDIN input when `-t` isn't given
+
+### Changed
+
+ - Minimum supported Rust version is now 1.74 (required by infer)
+
 ## 0.2.0
 
 This release is a rewrite of the parser to follow the WHATWG Fetch Standard (what browsers do),

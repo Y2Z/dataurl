@@ -1,7 +1,8 @@
-use dataurl::DataUrl;
+use dataurl::{detect_media_type, DataUrl};
 use std::ffi::OsString;
 use std::fs;
 use std::io::{self, IsTerminal, Read, Write};
+use std::path::Path;
 use std::process::exit;
 
 const NAME: &str = env!("CARGO_PKG_NAME");
@@ -28,7 +29,7 @@ Options:
   -f, --fragment <FRAGMENT>   Append URL fragment
   -i, --input-file <FILE>     Read input from FILE (\"-\" for STDIN)
   -o, --output-file <FILE>    Write output to FILE (\"-\" for STDOUT)
-  -t, --media-type <TYPE>     Set media type
+  -t, --media-type <TYPE>     Set media type (detected for files and STDIN if omitted)
   -h, --help                  Print help
   -V, --version               Print version
 ",
@@ -206,6 +207,16 @@ fn main() {
             data_url
                 .set_media_type(Some(media_type))
                 .unwrap_or_else(|_| fail(&format!("Invalid media type '{media_type}'")));
+        } else if options.input.is_none() {
+            // Files and STDIN get their media type detected (text given as an argument has none)
+            let file_name = options
+                .input_file
+                .as_deref()
+                .and_then(|path| Path::new(path).file_name())
+                .and_then(|name| name.to_str());
+            if let Some(media_type) = detect_media_type(&input, file_name) {
+                data_url.set_media_type(Some(media_type)).unwrap();
+            }
         }
 
         match (&options.charset, &options.input) {

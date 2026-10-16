@@ -1,11 +1,11 @@
 [package]
 name = "dataurl"
-version = "0.2.0"
+version = "0.2.1"
 authors = [
     "Sunshine <snshn@tutanota.com>",
 ]
 edition = "2021"
-rust-version = "1.73"
+rust-version = "1.74"
 description = "CLI tool and Rust crate for parsing and generating data URLs"
 homepage = "https://github.com/Y2Z/dataurl"
 repository = "https://github.com/Y2Z/dataurl"
@@ -25,6 +25,7 @@ license = "CC0-1.0"
 
 [dependencies]
 encoding_rs = "0.8.35" # Used for charsets (label validation, decoding and encoding text)
+infer = { version = "0.22.0", default-features = false } # Used for detecting media types by file signature
 
 [features]
 default = ["cli"]
