@@ -34,7 +34,13 @@
 //! # Ok::<(), dataurl::Error>(())
 //! ```
 //!
+//! If you only need to read data URLs, especially in `no_std` code, the [data-url] crate
+//! from the Servo project is a leaner alternative; this crate is for creating and modifying them,
+//! decoding text in other charsets, and detecting media types
+//! (see the [comparison](https://github.com/Y2Z/dataurl#comparison-with-data-url)).
+//!
 //! [data: URL processor]: https://fetch.spec.whatwg.org/#data-url-processor
+//! [data-url]: https://crates.io/crates/data-url
 
 mod base64;
 mod detect;

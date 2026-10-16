@@ -1,6 +1,8 @@
-[![dataurl build status on GNU/Linux](https://github.com/Y2Z/dataurl/workflows/GNU%2FLinux/badge.svg)](https://github.com/Y2Z/dataurl/actions?query=workflow%3AGNU%2FLinux)
-[![dataurl build status on macOS](https://github.com/Y2Z/dataurl/workflows/macOS/badge.svg)](https://github.com/Y2Z/dataurl/actions?query=workflow%3AmacOS)
-[![dataurl build status on Windows](https://github.com/Y2Z/dataurl/workflows/Windows/badge.svg)](https://github.com/Y2Z/dataurl/actions?query=workflow%3AWindows)
+[![dataurl on crates.io](https://img.shields.io/crates/v/dataurl.svg)](https://crates.io/crates/dataurl)
+[![dataurl documentation on docs.rs](https://docs.rs/dataurl/badge.svg)](https://docs.rs/dataurl)
+[![dataurl build status on GNU/Linux](https://github.com/Y2Z/dataurl/actions/workflows/build_gnu_linux.yml/badge.svg)](https://github.com/Y2Z/dataurl/actions/workflows/build_gnu_linux.yml)
+[![dataurl build status on macOS](https://github.com/Y2Z/dataurl/actions/workflows/build_macos.yml/badge.svg)](https://github.com/Y2Z/dataurl/actions/workflows/build_macos.yml)
+[![dataurl build status on Windows](https://github.com/Y2Z/dataurl/actions/workflows/build_windows.yml/badge.svg)](https://github.com/Y2Z/dataurl/actions/workflows/build_windows.yml)
 
 # dataurl
 
@@ -161,8 +163,31 @@ assert_eq!(extension_for_media_type("image/svg+xml"), Some("svg"));
 assert_eq!(extension_for_media_type("application/javascript"), Some("js"));
 ```
 
-If all you need is parsing, [data-url](https://crates.io/crates/data-url) (from the Servo project) is another spec-compliant option;
-dataurl also generates data URLs (picking the shortest encoding if asked to), handles charsets, detects media types, and comes with a CLI tool.
+The full API is documented on [docs.rs](https://docs.rs/dataurl).
+
+### Comparison with data-url
+
+[data-url](https://crates.io/crates/data-url), from the Servo project (it lives in the [rust-url](https://github.com/servo/rust-url) repository),
+is the other spec-compliant data URL crate. Both follow the WHATWG Fetch Standard and pass the Web Platform Tests, but they're built for different jobs:
+
+|                                              | dataurl                                       | data-url                                  |
+|----------------------------------------------|-----------------------------------------------|-------------------------------------------|
+| Parsing (WHATWG Fetch Standard)              | Yes                                           | Yes                                       |
+| Generating data URLs                         | Yes: percent-encoding, base64, or shortest    | No                                        |
+| Changing media type, charset, fragment, data | Yes                                           | No                                        |
+| Decoding text using the charset              | Yes (encoding_rs)                             | No, bytes only                            |
+| Media type detection                         | Yes (infer, plus file extensions)             | No                                        |
+| MIME type parser                             | Yes                                           | Yes                                       |
+| Forgiving-base64 decoder on its own          | No                                            | Yes                                       |
+| Decoding                                     | Into a `Vec<u8>`                              | Into a `Vec<u8>`, or streamed to a callback without copying the input |
+| `no_std`                                     | No                                            | Yes (with `alloc`)                        |
+| Dependencies                                 | encoding_rs, infer                            | None                                      |
+| Minimum Rust version                         | 1.74                                          | 1.51                                      |
+| CLI tool                                     | Yes                                           | No                                        |
+| License                                      | CC0 (public domain)                           | MIT or Apache-2.0                         |
+
+If you only need to read data URLs, especially in `no_std` code, or you already use the [url](https://crates.io/crates/url) crate, data-url is the leaner choice.
+If you need to create or modify data URLs, work with text in other charsets, or figure out what kind of file the data is, that's what dataurl is for.
 
 
 ---------------------------------------------------
