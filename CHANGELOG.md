@@ -29,6 +29,9 @@
 
 ### Testing
 
+ - CI checks the minimum supported Rust version (1.74), with the newest dependency versions that support it
+   (encoding_rs 0.8.40 and newer need Rust 1.88), and runs clippy and rustdoc with warnings treated as errors;
+   the stable, beta and nightly builds now really use those toolchains (they all used stable before)
  - Randomized round-trip tests (`tests/roundtrip.rs`) and [cargo-fuzz](https://github.com/rust-fuzz/cargo-fuzz)
    targets (`fuzz/`), which share the same checks: parsing never panics, and anything that parses or gets set
    survives being serialized and parsed again, with every combination of encoding and escaping

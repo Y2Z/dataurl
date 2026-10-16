@@ -10,6 +10,7 @@ jobs:
   build_and_test:
 
     strategy:
+      fail-fast: false
       matrix:
         os:
           - ubuntu-latest
@@ -20,15 +21,55 @@ jobs:
           - beta
           - nightly
     runs-on: ${{ matrix.os }}
+    # Nightly breaking shouldn't block pull requests
+    continue-on-error: ${{ matrix.rust == 'nightly' }}
 
     steps:
     - run: git config --global core.autocrlf false
     - uses: actions/checkout@v4
+    - name: Install Rust ${{ matrix.rust }}
+      run: |
+        rustup toolchain install ${{ matrix.rust }} --profile minimal
+        rustup default ${{ matrix.rust }}
     - name: Build
       run: cargo build --all --locked --verbose
     - name: Run tests
       run: cargo test --all --locked --verbose
+
+  # The minimum supported Rust version, as declared by rust-version in Cargo.toml
+  msrv:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: Install Rust 1.74
+      run: rustup toolchain install 1.74 --profile minimal
+    - name: Pick the newest dependency versions that support Rust 1.74
+      run: |
+        rm Cargo.lock
+        CARGO_RESOLVER_INCOMPATIBLE_RUST_VERSIONS=fallback cargo generate-lockfile
+        # Cargo before 1.78 can't read version 4 lockfiles (the format is otherwise the same)
+        sed -i 's/^version = 4$/version = 3/' Cargo.lock
+        grep -A1 'name = "encoding_rs"' Cargo.lock
+    - name: Build and run tests with Rust 1.74
+      run: cargo +1.74 test --locked --verbose
+
+  lint:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: Install Rust with rustfmt and clippy
+      run: |
+        rustup toolchain install stable --profile minimal --component rustfmt,clippy
+        rustup default stable
     - name: Check code formatting
       run: |
-        rustup component add rustfmt
         cargo fmt --all -- --check
+        rustfmt --edition 2021 --check fuzz/fuzz_targets/*.rs
+    - name: Run clippy
+      run: cargo clippy --all-targets --locked -- -D warnings
+    - name: Check documentation
+      run: cargo doc --no-deps --locked
+      env:
+        RUSTDOCFLAGS: -D warnings

@@ -82,6 +82,10 @@ assert_eq!(data_url.to_string(), "data:image/png;base64,iVBORw==");
 Data is stored as raw bytes and serialized as-is; use `set_text()` to store text encoded in the data URL's charset, and `text()` to decode it.
 Disabling default features skips the `cli` feature, which only matters for `cargo install`.
 
+The minimum supported Rust version is 1.74. Recent versions of encoding_rs (0.8.40 and newer) need Rust 1.88,
+so on older toolchains, have Cargo pick dependency versions that match yours:
+`CARGO_RESOLVER_INCOMPATIBLE_RUST_VERSIONS=fallback cargo update` (with Cargo 1.84 or newer).
+
 ### Choosing how data gets encoded
 
 `set_data_encoding()` picks percent-encoding (the default), base64, or `DataEncoding::Shortest`, whichever comes out shorter for the data.
