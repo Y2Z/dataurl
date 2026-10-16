@@ -177,6 +177,10 @@ impl DataUrl {
     ///
     /// Like URL parsers, this strips leading and trailing spaces and control characters,
     /// and ignores tabs and newlines anywhere in the input.
+    ///
+    /// The decoded data is never larger than the input, since both percent-encoding and base64
+    /// take more characters than the bytes they represent, so untrusted input can't make parsing
+    /// allocate more than a small multiple of its own size.
     pub fn parse(input: &str) -> Result<DataUrl, Error> {
         let input = input.trim_matches(|c: char| c <= ' ');
         let input: Cow<str> = if input.contains(['\t', '\n', '\r']) {

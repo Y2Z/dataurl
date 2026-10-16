@@ -27,6 +27,12 @@
    from about 40 MB to 10 MB (just the result), and parsing got about a third faster
  - The CLI writes its output as it encodes, instead of building it in memory first
 
+### Testing
+
+ - Randomized round-trip tests (`tests/roundtrip.rs`) and [cargo-fuzz](https://github.com/rust-fuzz/cargo-fuzz)
+   targets (`fuzz/`), which share the same checks: parsing never panics, and anything that parses or gets set
+   survives being serialized and parsed again, with every combination of encoding and escaping
+
 ## 0.2.1
 
 ### Added
