@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.3.0 (unreleased)
+
+### Added
+
+ - `dataurl::mime::MimeType` (also exported as `dataurl::MimeType`): the WHATWG MIME type parser used for
+   data URLs, available on its own, e.g. for `Content-Type` headers
+ - `DataUrl::set_mime_type()`, which sets the media type and all of its parameters from a `MimeType`
+ - `DataEncoding::Shortest`, which picks percent-encoding or base64, whichever results in a shorter data URL
+ - `Escaping::Minimal`, which only escapes what has to be when percent-encoding, for data URLs that go inside
+   double-quoted HTML attributes or CSS strings; this keeps text formats like SVG short and readable
+
+### Changed
+
+ - `DataUrl::mime_type()` returns a `MimeType` instead of a `String` (use `.to_string()` for the old result)
+ - `is_base64_encoded()` and `set_is_base64_encoded()` are replaced by `data_encoding()` and `set_data_encoding()`,
+   which use the new `DataEncoding` enum (`Percent`, `Base64` or `Shortest`)
+ - Percent-encoding now also escapes `&`, so that HTML entities can't alter the data
+   when a data URL is put into an HTML attribute by hand
+
 ## 0.2.1
 
 ### Added

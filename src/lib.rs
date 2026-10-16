@@ -6,20 +6,31 @@
 //! forgiving base64, and MIME type parsing.
 //!
 //! ```
-//! use dataurl::DataUrl;
+//! use dataurl::{DataEncoding, DataUrl, Escaping};
 //!
 //! let data_url: DataUrl = "data:,Hello,%20World!".parse()?;
 //! assert_eq!(data_url.media_type(), "text/plain");
-//! assert_eq!(data_url.mime_type(), "text/plain;charset=US-ASCII");
+//! assert_eq!(data_url.mime_type().to_string(), "text/plain;charset=US-ASCII");
 //! assert_eq!(data_url.charset(), "US-ASCII");
 //! assert_eq!(data_url.data(), b"Hello, World!");
 //! assert_eq!(data_url.text(), "Hello, World!");
 //!
 //! let mut data_url = DataUrl::new();
 //! data_url.set_media_type(Some("image/png"))?;
-//! data_url.set_is_base64_encoded(true);
+//! data_url.set_data_encoding(DataEncoding::Base64);
 //! data_url.set_data(&[0x89, 0x50, 0x4E, 0x47]);
 //! assert_eq!(data_url.to_string(), "data:image/png;base64,iVBORw==");
+//!
+//! // For text, percent-encoding with minimal escaping is often much shorter than base64
+//! let mut data_url = DataUrl::new();
+//! data_url.set_media_type(Some("image/svg+xml"))?;
+//! data_url.set_data_encoding(DataEncoding::Shortest);
+//! data_url.set_escaping(Escaping::Minimal);
+//! data_url.set_data(b"<svg xmlns='http://www.w3.org/2000/svg'><circle r='4'/></svg>");
+//! assert_eq!(
+//!     data_url.to_string(),
+//!     "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'%3E%3Ccircle r='4'/%3E%3C/svg%3E"
+//! );
 //! # Ok::<(), dataurl::Error>(())
 //! ```
 //!
@@ -27,10 +38,11 @@
 
 mod base64;
 mod detect;
-mod mime;
+pub mod mime;
 mod percent;
 
 pub use detect::detect_media_type;
+pub use mime::MimeType;
 
 use encoding_rs::{Encoding, REPLACEMENT, UTF_16BE, UTF_16LE, WINDOWS_1252};
 use std::borrow::Cow;
@@ -92,6 +104,39 @@ impl fmt::Display for Error {
 
 impl std::error::Error for Error {}
 
+/// How the data part of a data URL gets encoded when serializing.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+#[non_exhaustive]
+pub enum DataEncoding {
+    /// Percent-encoding (`data:,Hello%2C%20World`), which keeps text readable.
+    #[default]
+    Percent,
+    /// Base64 (`data:;base64,SGVsbG8sIFdvcmxk`), which is more compact for binary data.
+    Base64,
+    /// Whichever of the two results in a shorter data URL, given the [`Escaping`] in use.
+    /// Parsing never yields this value, since a parsed data URL is either one or the other.
+    Shortest,
+}
+
+/// How much of the data gets escaped when it's percent-encoded.
+///
+/// Some characters always get escaped, whichever option is used: those that can't appear in
+/// a data URL (controls, non-ASCII, `%`, `#`), those that would end or alter a double-quoted
+/// HTML attribute, a CSS string, or a `<style>` or `<script>` element containing the data URL
+/// (`"`, `&`, `<`, `>`, `\`), and spaces at the very end (which URL parsers strip).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+#[non_exhaustive]
+pub enum Escaping {
+    /// Also escapes spaces and `'`, `(`, `)` and `` ` ``, so the data URL is safe to put anywhere:
+    /// unquoted HTML attributes, unquoted CSS `url()`, `srcset`, or plain text.
+    #[default]
+    Full,
+    /// Only escapes what has to be, which keeps text formats like SVG short and readable,
+    /// but the result must only be used inside double quotes (an HTML attribute or a CSS string),
+    /// and not in `srcset`, which splits on spaces.
+    Minimal,
+}
+
 /// A parsed (or under construction) data URL.
 ///
 /// The data is always kept as raw bytes, exactly as it was decoded or set.
@@ -101,7 +146,8 @@ impl std::error::Error for Error {}
 pub struct DataUrl {
     media_type: Option<String>, // Lowercased type/subtype; None if omitted ("text/plain" implied)
     parameters: Vec<(String, String)>, // Media type parameters (charset, etc), names lowercased
-    is_base64_encoded: bool,
+    data_encoding: DataEncoding,
+    escaping: Escaping,
     data: Vec<u8>,
     fragment: Option<String>,
 }
@@ -112,7 +158,8 @@ impl fmt::Debug for DataUrl {
         f.debug_struct("DataUrl")
             .field("media_type", &self.media_type)
             .field("parameters", &self.parameters)
-            .field("is_base64_encoded", &self.is_base64_encoded)
+            .field("data_encoding", &self.data_encoding)
+            .field("escaping", &self.escaping)
             .field("data", &format_args!("[{} bytes]", self.data.len()))
             .field("fragment", &self.fragment)
             .finish()
@@ -167,13 +214,13 @@ impl DataUrl {
 
         let mut data: Vec<u8> = percent::decode(encoded_data.as_bytes());
 
-        let is_base64_encoded = match strip_base64_marker(mime_type) {
+        let data_encoding = match strip_base64_marker(mime_type) {
             Some(stripped) => {
                 data = base64::decode_forgiving(&data).ok_or(Error::InvalidBase64)?;
                 mime_type = stripped;
-                true
+                DataEncoding::Base64
             }
-            None => false,
+            None => DataEncoding::Percent,
         };
 
         let (media_type, parameters) = if mime_type.starts_with(';') {
@@ -194,7 +241,8 @@ impl DataUrl {
         Ok(DataUrl {
             media_type,
             parameters,
-            is_base64_encoded,
+            data_encoding,
+            escaping: Escaping::default(),
             data,
             fragment,
         })
@@ -222,15 +270,46 @@ impl DataUrl {
     }
 
     /// The full MIME type including parameters, the way browsers report it,
-    /// e.g. `"text/plain;charset=US-ASCII"` for `data:,`.
-    pub fn mime_type(&self) -> String {
+    /// e.g. `text/plain;charset=US-ASCII` for `data:,`.
+    pub fn mime_type(&self) -> MimeType {
         if self.media_type.is_none() && self.parameters.is_empty() {
-            return format!("{DEFAULT_MEDIA_TYPE};charset={DEFAULT_CHARSET}");
+            return MimeType {
+                essence: DEFAULT_MEDIA_TYPE.to_string(),
+                parameters: vec![("charset".to_string(), DEFAULT_CHARSET.to_string())],
+            };
         }
 
-        let mut mime_type = self.media_type().to_string();
-        mime::serialize_parameters(&mut mime_type, &self.parameters);
-        mime_type
+        MimeType {
+            essence: self.media_type().to_string(),
+            parameters: self.parameters.clone(),
+        }
+    }
+
+    /// Sets the media type and all of its parameters at once, e.g. from a `Content-Type` header,
+    /// or removes both with `None`.
+    ///
+    /// Fails if a parameter value can't be represented in a data URL
+    /// (see [`set_parameter`](DataUrl::set_parameter)), in which case nothing changes.
+    pub fn set_mime_type(&mut self, mime_type: Option<&MimeType>) -> Result<(), Error> {
+        match mime_type {
+            Some(mime_type) => {
+                if !mime_type
+                    .parameters
+                    .iter()
+                    .all(|(_, value)| is_representable_parameter_value(value))
+                {
+                    return Err(Error::InvalidParameter);
+                }
+                self.media_type = Some(mime_type.essence.clone());
+                self.parameters = mime_type.parameters.clone();
+            }
+            None => {
+                self.media_type = None;
+                self.parameters.clear();
+            }
+        }
+
+        Ok(())
     }
 
     /// Sets the media type essence (e.g. `"image/png"`), or removes it with `None`.
@@ -281,10 +360,7 @@ impl DataUrl {
 
         match value {
             Some(value) => {
-                if !value
-                    .bytes()
-                    .all(|b| matches!(b, b' '..=b'~') && b != b',' && b != b'#')
-                {
+                if !is_representable_parameter_value(value) {
                     return Err(Error::InvalidParameter);
                 }
                 match self.parameters.iter_mut().find(|(n, _)| *n == name) {
@@ -332,14 +408,25 @@ impl DataUrl {
             .unwrap_or(WINDOWS_1252)
     }
 
-    /// Whether the data gets serialized as base64 (and whether it was, when parsed).
-    pub fn is_base64_encoded(&self) -> bool {
-        self.is_base64_encoded
+    /// How the data gets encoded when serializing; for a parsed data URL,
+    /// how it was encoded ([`Percent`](DataEncoding::Percent) or [`Base64`](DataEncoding::Base64)).
+    pub fn data_encoding(&self) -> DataEncoding {
+        self.data_encoding
     }
 
-    /// Sets whether the data gets serialized as base64 or percent-encoded.
-    pub fn set_is_base64_encoded(&mut self, is_base64_encoded: bool) {
-        self.is_base64_encoded = is_base64_encoded;
+    /// Sets how the data gets encoded when serializing.
+    pub fn set_data_encoding(&mut self, data_encoding: DataEncoding) {
+        self.data_encoding = data_encoding;
+    }
+
+    /// How much of the data gets escaped when it's percent-encoded.
+    pub fn escaping(&self) -> Escaping {
+        self.escaping
+    }
+
+    /// Sets how much of the data gets escaped when it's percent-encoded.
+    pub fn set_escaping(&mut self, escaping: Escaping) {
+        self.escaping = escaping;
     }
 
     /// The raw data.
@@ -407,12 +494,26 @@ impl fmt::Display for DataUrl {
         }
         mime::serialize_parameters(&mut output, &self.parameters);
 
-        if self.is_base64_encoded {
+        let should_encode: fn(u8) -> bool = match self.escaping {
+            Escaping::Full => percent::in_data_set,
+            Escaping::Minimal => percent::in_minimal_data_set,
+        };
+        let use_base64 = match self.data_encoding {
+            DataEncoding::Percent => false,
+            DataEncoding::Base64 => true,
+            DataEncoding::Shortest => {
+                // ";base64" plus 4 characters for every 3 bytes, versus 1 or 3 characters per byte
+                let base64_length = 7 + self.data.len().div_ceil(3) * 4;
+                base64_length < percent::encoded_length(&self.data, should_encode)
+            }
+        };
+
+        if use_base64 {
             output.push_str(";base64,");
             base64::encode_into(&mut output, &self.data);
         } else {
             output.push(',');
-            percent::encode_into(&mut output, &self.data, percent::in_data_set);
+            percent::encode_data_into(&mut output, &self.data, should_encode);
         }
 
         if let Some(fragment) = &self.fragment {
@@ -438,6 +539,14 @@ impl TryFrom<&str> for DataUrl {
     fn try_from(input: &str) -> Result<DataUrl, Error> {
         DataUrl::parse(input)
     }
+}
+
+/// Whether a parameter value can be put in the metadata part of a data URL as is:
+/// printable ASCII, except for "," (which ends the metadata) and "#" (which starts the fragment).
+fn is_representable_parameter_value(value: &str) -> bool {
+    value
+        .bytes()
+        .all(|b| matches!(b, b' '..=b'~') && b != b',' && b != b'#')
 }
 
 /// If the metadata ends with ";base64" (optionally with spaces after the semicolon),

@@ -19,12 +19,20 @@ fn wpt_data_urls() {
             Some(expected_mime_type) => {
                 let data_url = DataUrl::parse(input)
                     .unwrap_or_else(|e| panic!("{input:?} must be parsed, got {e:?}"));
-                assert_eq!(data_url.mime_type(), expected_mime_type, "{input:?}");
+                assert_eq!(
+                    data_url.mime_type().to_string(),
+                    expected_mime_type,
+                    "{input:?}"
+                );
                 assert_eq!(data_url.data(), test[2].as_bytes(), "{input:?}");
 
                 // Serializing and parsing again must yield the same result
                 let reparsed = DataUrl::parse(&data_url.to_string()).unwrap();
-                assert_eq!(reparsed.mime_type(), expected_mime_type, "{input:?}");
+                assert_eq!(
+                    reparsed.mime_type().to_string(),
+                    expected_mime_type,
+                    "{input:?}"
+                );
                 assert_eq!(reparsed.data(), data_url.data(), "{input:?}");
             }
             None => assert!(DataUrl::parse(input).is_err(), "{input:?} must fail"),
