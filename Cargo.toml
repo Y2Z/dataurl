@@ -1,37 +1,36 @@
 [package]
 name = "dataurl"
-version = "0.1.2"
+version = "0.2.0"
 authors = [
-    "Sunshine <sunshine@uberspace.net>",
+    "Sunshine <snshn@tutanota.com>",
 ]
-edition = "2018"
+edition = "2021"
+rust-version = "1.73"
 description = "CLI tool and Rust crate for parsing and generating data URLs"
 homepage = "https://github.com/Y2Z/dataurl"
 repository = "https://github.com/Y2Z/dataurl"
+documentation = "https://docs.rs/dataurl"
 readme = "README.md"
-keywords = ["web", "command-line"]
+keywords = ["data-url", "base64", "mime", "uri", "command-line"]
 categories = ["command-line-utilities", "encoding", "parsing", "web-programming"]
 include = [
-    "src/*.rs",
+    "src/**/*.rs",
+    "tests/**/*",
     "Cargo.toml",
+    "CHANGELOG.md",
+    "LICENSE",
+    "README.md",
 ]
 license = "CC0-1.0"
 
 [dependencies]
-atty = "0.2.14"
-base64 = "0.22.1"
-clap = { version = "2.33.3", optional = true } 
-encoding_rs = "0.8.35"
-percent-encoding = "2.3.1"
-url = "2.5.4"
-
-[dev-dependencies]
-assert_cmd = "2.0.16"
+encoding_rs = "0.8.35" # Used for charsets (label validation, decoding and encoding text)
 
 [features]
 default = ["cli"]
-cli = ["clap"]
+cli = [] # Build the dataurl executable (no extra dependencies, kept for compatibility)
 
 [[bin]]
 name = "dataurl"
+path = "src/main.rs"
 required-features = ["cli"]
