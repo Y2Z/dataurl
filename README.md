@@ -139,6 +139,27 @@ dataurl also generates data URLs (picking the shortest encoding if asked to), ha
 ---------------------------------------------------
 
 
+## Testing
+
+```console
+make test
+```
+
+Besides unit tests, this runs the [Web Platform Tests](https://github.com/web-platform-tests/wpt) suites for data URLs,
+base64 and MIME types (in `tests/wpt/`), and randomized round-trip tests (`tests/roundtrip.rs`).
+Those run 5000 iterations each by default; set `DATAURL_ROUNDTRIP_ITERATIONS` for more.
+The same checks are available as [cargo-fuzz](https://github.com/rust-fuzz/cargo-fuzz) targets, which need a nightly toolchain:
+
+```console
+cargo install cargo-fuzz
+cargo +nightly fuzz run parse
+cargo +nightly fuzz run serialize
+```
+
+
+---------------------------------------------------
+
+
 ## Installation
 
 #### Using [Cargo](https://crates.io/crates/dataurl)
