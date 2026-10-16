@@ -26,10 +26,18 @@ license = "CC0-1.0"
 [dependencies]
 encoding_rs = "0.8.35" # Used for charsets (label validation, decoding and encoding text)
 infer = { version = "0.22.0", default-features = false } # Used for detecting media types by file signature
+serde = { version = "1.0", default-features = false, optional = true } # Used for the optional serde support
+
+[dev-dependencies]
+serde_test = "1.0.177" # Used for testing the serde support
 
 [features]
 default = ["cli"]
 cli = [] # Build the dataurl executable (no extra dependencies, kept for compatibility)
+serde = ["dep:serde"] # Implement Serialize and Deserialize for DataUrl and MimeType
+
+[package.metadata.docs.rs]
+all-features = true
 
 [[bin]]
 name = "dataurl"

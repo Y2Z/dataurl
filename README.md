@@ -165,6 +165,29 @@ assert_eq!(extension_for_media_type("application/javascript"), Some("js"));
 
 The full API is documented on [docs.rs](https://docs.rs/dataurl).
 
+### Serde
+
+With the `serde` feature, `DataUrl` and `MimeType` implement `Serialize` and `Deserialize`, as strings,
+so they can be part of configuration files, API responses and so on:
+
+```toml
+[dependencies]
+dataurl = { version = "0.3", default-features = false, features = ["serde"] }
+```
+
+```rust
+use dataurl::DataUrl;
+use serde::{Deserialize, Serialize};
+
+#[derive(Serialize, Deserialize)]
+struct Theme {
+    name: String,
+    logo: DataUrl, // "data:image/svg+xml,..." in JSON, TOML, YAML…
+}
+```
+
+Invalid data URLs and MIME types make deserializing fail.
+
 ### Comparison with data-url
 
 [data-url](https://crates.io/crates/data-url), from the Servo project (it lives in the [rust-url](https://github.com/servo/rust-url) repository),
@@ -199,7 +222,7 @@ If you need to create or modify data URLs, work with text in other charsets, or 
 make test
 ```
 
-Besides unit tests, this runs the [Web Platform Tests](https://github.com/web-platform-tests/wpt) suites for data URLs,
+Besides unit tests (including the ones for the `serde` feature), this runs the [Web Platform Tests](https://github.com/web-platform-tests/wpt) suites for data URLs,
 base64 and MIME types (in `tests/wpt/`), and randomized round-trip tests (`tests/roundtrip.rs`).
 Those run 5000 iterations each by default; set `DATAURL_ROUNDTRIP_ITERATIONS` for more.
 The same checks are available as [cargo-fuzz](https://github.com/rust-fuzz/cargo-fuzz) targets, which need a nightly toolchain:
