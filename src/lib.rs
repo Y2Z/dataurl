@@ -1,378 +1,559 @@
-use base64::{engine::general_purpose::URL_SAFE, Engine as _};
-use encoding_rs::Encoding;
-use percent_encoding::{percent_decode_str, percent_encode, utf8_percent_encode, NON_ALPHANUMERIC};
-use std::fmt;
-use url::Url;
+//! Parsing and generating `data:` URLs.
+//!
+//! Parsing follows the [data: URL processor] from the WHATWG Fetch Standard, which is what
+//! browsers implement (RFC 2397 describes the scheme, but it's not what the web runs on).
+//! The implementation is checked against the Web Platform Tests suites for data URLs,
+//! forgiving base64, and MIME type parsing.
+//!
+//! ```
+//! use dataurl::DataUrl;
+//!
+//! let data_url: DataUrl = "data:,Hello,%20World!".parse()?;
+//! assert_eq!(data_url.media_type(), "text/plain");
+//! assert_eq!(data_url.mime_type(), "text/plain;charset=US-ASCII");
+//! assert_eq!(data_url.charset(), "US-ASCII");
+//! assert_eq!(data_url.data(), b"Hello, World!");
+//! assert_eq!(data_url.text(), "Hello, World!");
+//!
+//! let mut data_url = DataUrl::new();
+//! data_url.set_media_type(Some("image/png"))?;
+//! data_url.set_is_base64_encoded(true);
+//! data_url.set_data(&[0x89, 0x50, 0x4E, 0x47]);
+//! assert_eq!(data_url.to_string(), "data:image/png;base64,iVBORw==");
+//! # Ok::<(), dataurl::Error>(())
+//! ```
+//!
+//! [data: URL processor]: https://fetch.spec.whatwg.org/#data-url-processor
 
-const DEFAULT_MEDIA_TYPE: &'static str = "text/plain";
-const DEFAULT_CHARSET: &'static str = "US-ASCII";
-const TEXTUAL_MEDIA_TYPES: &'static [&str] = &[
-    "application/atom+xml",
+mod base64;
+mod mime;
+mod percent;
+
+use encoding_rs::{Encoding, REPLACEMENT, UTF_16BE, UTF_16LE, WINDOWS_1252};
+use std::borrow::Cow;
+use std::fmt;
+use std::str::FromStr;
+
+const DEFAULT_MEDIA_TYPE: &str = "text/plain";
+const DEFAULT_CHARSET: &str = "US-ASCII";
+const TEXTUAL_MEDIA_TYPES: &[&str] = &[
     "application/dart",
     "application/ecmascript",
     "application/javascript",
     "application/json",
     "application/jwt",
-    "application/rdf+xml",
-    "application/rss+xml",
-    "application/soap+xml",
-    "application/vnd.mozilla.xul+xml",
     "application/x-javascript",
+    "application/x-www-form-urlencoded",
     "application/x-yaml",
-    "application/xhtml+xml",
     "application/xml",
     "application/xml-dtd",
-    "application/xop+xml",
     "application/yaml",
-    "image/svg+xml",
-    "message/imdn+xml",
-    "model/x3d+xml",
 ];
 
-// TODO: add support for other optional parameters besides charset (filename, etc)
+/// Errors returned when parsing or modifying a [`DataUrl`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum Error {
+    /// The input doesn't start with the `data:` scheme.
+    NotADataUrl,
+    /// The input starts with `data:`, but isn't a valid URL (e.g. it has a malformed authority).
+    InvalidUrl,
+    /// There's no comma separating the metadata from the data.
+    MissingComma,
+    /// The data is marked as base64-encoded, but isn't valid base64.
+    InvalidBase64,
+    /// The media type isn't of the `type/subtype` form.
+    InvalidMediaType,
+    /// The media type parameter has an invalid name or value.
+    InvalidParameter,
+    /// The charset is unknown, or can't be used for data URLs.
+    InvalidCharset,
+    /// The text contains characters that the data URL's charset can't represent.
+    UnencodableText,
+}
+
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.write_str(match self {
+            Error::NotADataUrl => "not a data URL",
+            Error::InvalidUrl => "invalid URL",
+            Error::MissingComma => "data URL has no comma separating metadata from data",
+            Error::InvalidBase64 => "data URL contains invalid base64",
+            Error::InvalidMediaType => "invalid media type",
+            Error::InvalidParameter => "invalid media type parameter",
+            Error::InvalidCharset => "invalid or unsupported charset",
+            Error::UnencodableText => "text can't be represented in the data URL's charset",
+        })
+    }
+}
+
+impl std::error::Error for Error {}
+
+/// A parsed (or under construction) data URL.
+///
+/// The data is always kept as raw bytes, exactly as it was decoded or set.
+/// Serializing (via [`Display`](fmt::Display), so `to_string()` or `format!`) never transcodes it;
+/// use [`set_text`](DataUrl::set_text) to store text in the data URL's charset.
+#[derive(Clone, PartialEq, Eq, Default)]
 pub struct DataUrl {
-    media_type: Option<String>, // Media type
-    charset: Option<String>,    // US-ASCII is default, according to the spec
-    is_base64_encoded: bool,    // Indicates if it's a base64-encoded data URL
-    data: Vec<u8>,              // Data, bytes, UTF-8 if text
-    fragment: Option<String>,   // #something-at-the-end, None by default
+    media_type: Option<String>, // Lowercased type/subtype; None if omitted ("text/plain" implied)
+    parameters: Vec<(String, String)>, // Media type parameters (charset, etc), names lowercased
+    is_base64_encoded: bool,
+    data: Vec<u8>,
+    fragment: Option<String>,
 }
 
-pub enum DataUrlParseError {
-    UrlParseError,
-    MalformedDataUrlError,
-    Base64DecodeError,
-}
-
-impl fmt::Debug for DataUrlParseError {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        fmt.debug_struct("DataUrlParseError").finish()
+impl fmt::Debug for DataUrl {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        // Data can be megabytes long, so only its length is shown
+        f.debug_struct("DataUrl")
+            .field("media_type", &self.media_type)
+            .field("parameters", &self.parameters)
+            .field("is_base64_encoded", &self.is_base64_encoded)
+            .field("data", &format_args!("[{} bytes]", self.data.len()))
+            .field("fragment", &self.fragment)
+            .finish()
     }
-}
-
-pub(crate) fn parse_data_url_meta_data(
-    meta_data_string: String,
-) -> (Option<String>, Option<String>, bool) {
-    let mut media_type: Option<String> = None;
-    let mut charset: Option<String> = None;
-    let mut is_base64_encoded: bool = false;
-
-    // Parse meta data
-    let content_type_items: Vec<&str> = meta_data_string.split(';').collect();
-    let mut i: i8 = 0;
-    for item in &content_type_items {
-        // Media type has to always come first in data URLs
-        if i == 0 {
-            if item.trim().len() > 0 && validate_media_type(item) {
-                media_type = Some(item.trim().to_lowercase().to_string());
-            }
-        } else {
-            if !is_base64_encoded && item.trim().to_lowercase().starts_with("charset=") {
-                // only the first occurence of charset counts
-                if charset.is_none() {
-                    if let Some(e) = Encoding::for_label_no_replacement((&item[8..]).as_bytes()) {
-                        charset = Some(e.name().to_string());
-                    }
-                }
-            } else if item.trim().eq_ignore_ascii_case("base64") {
-                is_base64_encoded = true;
-            }
-        }
-
-        i += 1;
-    }
-
-    (media_type, charset, is_base64_encoded)
-}
-
-pub(crate) fn validate_media_type(media_type: &str) -> bool {
-    // Must contain one slash
-    media_type.split('/').collect::<Vec<&str>>().len() == 2
 }
 
 impl DataUrl {
+    /// Creates an empty data URL (`data:,`).
     pub fn new() -> DataUrl {
-        DataUrl {
-            media_type: None,
-            charset: None,
-            is_base64_encoded: false,
-            data: [].to_vec(),
-            fragment: None,
-        }
+        DataUrl::default()
     }
 
-    // TODO: rename to from_string/from_str/from — look for how it's done for String and similar
-    pub fn parse(input_str: &str) -> Result<Self, DataUrlParseError> {
-        match Url::parse(input_str) {
-            Ok(url) => {
-                let path: String = url.path().to_string();
-                if let Some(comma_offset) = path.find(',') {
-                    let fragment: Option<&str> = url.fragment();
-
-                    // Parse meta data
-                    let meta_data_string = String::from(&path[..comma_offset]);
-                    let (media_type, charset, is_base64_encoded) =
-                        parse_data_url_meta_data(meta_data_string);
-
-                    // Parse raw data into vector of bytes
-                    let mut d: Vec<u8> = percent_decode_str(&path[comma_offset + 1..]).collect();
-                    if let Some(query) = url.query() {
-                        d.push("?".as_bytes()[0]);
-                        d.append(&mut percent_decode_str(&query).collect());
-                    }
-                    let mut unable_to_decode_base64: bool = false;
-                    let blob: Vec<u8> = if is_base64_encoded {
-                        match URL_SAFE.decode(&d) {
-                            Ok(decoded) => decoded,
-                            Err(_) => {
-                                unable_to_decode_base64 = true;
-                                [].to_vec()
-                            }
-                        }
-                    } else {
-                        d
-                    };
-
-                    if unable_to_decode_base64 {
-                        return Err(DataUrlParseError::Base64DecodeError);
-                    }
-
-                    Ok(DataUrl {
-                        media_type: media_type,
-                        charset: charset,
-                        is_base64_encoded: is_base64_encoded,
-                        data: blob,
-                        fragment: if let Some(f) = fragment {
-                            Some(f.to_string())
-                        } else {
-                            None
-                        },
-                    })
-                } else {
-                    Err(DataUrlParseError::MalformedDataUrlError)
-                }
-            }
-            Err(_) => Err(DataUrlParseError::UrlParseError),
-        }
-    }
-
-    pub fn is_binary(&self) -> bool {
-        if self.media_type.is_none() {
-            return false;
-        }
-
-        let current_media_type: &str = &self.media_type.as_ref().unwrap();
-        let is_textual: bool = if current_media_type.split('/').collect::<Vec<&str>>()[0]
-            .eq_ignore_ascii_case("text")
-        {
-            true
+    /// Parses a data URL the way browsers do.
+    ///
+    /// Like URL parsers, this strips leading and trailing spaces and control characters,
+    /// and ignores tabs and newlines anywhere in the input.
+    pub fn parse(input: &str) -> Result<DataUrl, Error> {
+        let input = input.trim_matches(|c: char| c <= ' ');
+        let input: Cow<str> = if input.contains(['\t', '\n', '\r']) {
+            Cow::Owned(input.replace(['\t', '\n', '\r'], ""))
         } else {
-            TEXTUAL_MEDIA_TYPES
-                .iter()
-                .find(|mt| current_media_type.eq_ignore_ascii_case(mt))
-                .is_some()
+            Cow::Borrowed(input)
         };
+
+        match input.get(..5) {
+            Some(scheme) if scheme.eq_ignore_ascii_case("data:") => {}
+            _ => return Err(Error::NotADataUrl),
+        }
+
+        let (rest, fragment) = match input[5..].split_once('#') {
+            Some((rest, fragment)) => (rest, Some(fragment.to_string())),
+            None => (&input[5..], None),
+        };
+
+        // Hierarchical forms like "data://host/path" are rare, but they're valid URLs with their own rules
+        let rest: Cow<str> = if rest.starts_with('/') {
+            Cow::Owned(normalize_hierarchical_part(rest)?)
+        } else {
+            Cow::Borrowed(rest)
+        };
+
+        let (meta_data, encoded_data) = rest.split_once(',').ok_or(Error::MissingComma)?;
+
+        // The metadata part isn't percent-decoded, but URL parsers do percent-encode some of it
+        let mut mime_type = String::with_capacity(meta_data.len());
+        percent::encode_into(
+            &mut mime_type,
+            meta_data.as_bytes(),
+            percent::in_c0_control_set,
+        );
+        let mut mime_type: &str = mime_type.trim_matches(|c: char| c.is_ascii_whitespace());
+
+        let mut data: Vec<u8> = percent::decode(encoded_data.as_bytes());
+
+        let is_base64_encoded = match strip_base64_marker(mime_type) {
+            Some(stripped) => {
+                data = base64::decode_forgiving(&data).ok_or(Error::InvalidBase64)?;
+                mime_type = stripped;
+                true
+            }
+            None => false,
+        };
+
+        let (media_type, parameters) = if mime_type.starts_with(';') {
+            // The media type was omitted, but parameters may be present
+            match mime::parse(&format!("{DEFAULT_MEDIA_TYPE}{mime_type}")) {
+                // Keep it explicit if there are no parameters, otherwise it'd revert to the default charset
+                Some(m) if m.parameters.is_empty() => (Some(m.essence), m.parameters),
+                Some(m) => (None, m.parameters),
+                None => (None, Vec::new()),
+            }
+        } else {
+            match mime::parse(mime_type) {
+                Some(m) => (Some(m.essence), m.parameters),
+                None => (None, Vec::new()),
+            }
+        };
+
+        Ok(DataUrl {
+            media_type,
+            parameters,
+            is_base64_encoded,
+            data,
+            fragment,
+        })
+    }
+
+    /// Returns true if the media type isn't a textual one.
+    pub fn is_binary(&self) -> bool {
+        let media_type: &str = self.media_type();
+        let is_textual = media_type.starts_with("text/")
+            || media_type.ends_with("+xml")
+            || media_type.ends_with("+json")
+            || TEXTUAL_MEDIA_TYPES.contains(&media_type);
 
         !is_textual
     }
 
+    /// The media type's essence (`type/subtype`, lowercase), `"text/plain"` if omitted.
     pub fn media_type(&self) -> &str {
-        if let Some(mt) = &self.media_type {
-            mt
-        } else {
-            DEFAULT_MEDIA_TYPE
-        }
+        self.media_type.as_deref().unwrap_or(DEFAULT_MEDIA_TYPE)
     }
 
-    pub fn media_type_no_default(&self) -> Option<String> {
-        if let Some(mt) = &self.media_type {
-            Some(mt.to_string())
-        } else {
-            None
-        }
+    /// The media type's essence, `None` if omitted.
+    pub fn media_type_no_default(&self) -> Option<&str> {
+        self.media_type.as_deref()
     }
 
-    pub fn set_media_type(&mut self, new_media_type: Option<String>) -> bool {
-        if let Some(mt) = new_media_type {
-            if mt.trim().len() > 0 && validate_media_type(&mt) {
-                self.media_type = Some(mt.to_string());
-                true
-            } else {
-                // Empty media type makes it fall back to default (text/plain)
-                self.media_type = None;
-                false
+    /// The full MIME type including parameters, the way browsers report it,
+    /// e.g. `"text/plain;charset=US-ASCII"` for `data:,`.
+    pub fn mime_type(&self) -> String {
+        if self.media_type.is_none() && self.parameters.is_empty() {
+            return format!("{DEFAULT_MEDIA_TYPE};charset={DEFAULT_CHARSET}");
+        }
+
+        let mut mime_type = self.media_type().to_string();
+        mime::serialize_parameters(&mut mime_type, &self.parameters);
+        mime_type
+    }
+
+    /// Sets the media type essence (e.g. `"image/png"`), or removes it with `None`.
+    /// Parameters such as charset are kept, and can't be part of the given value.
+    pub fn set_media_type(&mut self, media_type: Option<&str>) -> Result<(), Error> {
+        match media_type {
+            Some(media_type) => {
+                let (top_level_type, subtype) = media_type
+                    .trim_matches(mime::is_http_whitespace)
+                    .split_once('/')
+                    .ok_or(Error::InvalidMediaType)?;
+                if !mime::is_valid_essence(top_level_type) || !mime::is_valid_essence(subtype) {
+                    return Err(Error::InvalidMediaType);
+                }
+                self.media_type = Some(format!("{top_level_type}/{subtype}").to_ascii_lowercase());
             }
-        } else {
-            self.media_type = None;
-            true
+            None => self.media_type = None,
         }
+
+        Ok(())
     }
 
+    /// Iterates over media type parameters as `(name, value)` pairs, in order.
+    pub fn parameters(&self) -> impl Iterator<Item = (&str, &str)> {
+        self.parameters
+            .iter()
+            .map(|(n, v)| (n.as_str(), v.as_str()))
+    }
+
+    /// Returns the value of a media type parameter (names are case-insensitive).
+    pub fn parameter(&self, name: &str) -> Option<&str> {
+        self.parameters
+            .iter()
+            .find(|(n, _)| n.eq_ignore_ascii_case(name))
+            .map(|(_, v)| v.as_str())
+    }
+
+    /// Sets or replaces a media type parameter, or removes it with `None`.
+    ///
+    /// Values may contain any printable ASCII character except `,` and `#`,
+    /// which can't be represented in the metadata part of a data URL.
+    /// For charset, prefer [`set_charset`](DataUrl::set_charset), which validates the value.
+    pub fn set_parameter(&mut self, name: &str, value: Option<&str>) -> Result<(), Error> {
+        if !mime::is_valid_essence(name) {
+            return Err(Error::InvalidParameter);
+        }
+        let name = name.to_ascii_lowercase();
+
+        match value {
+            Some(value) => {
+                if !value
+                    .bytes()
+                    .all(|b| matches!(b, b' '..=b'~') && b != b',' && b != b'#')
+                {
+                    return Err(Error::InvalidParameter);
+                }
+                match self.parameters.iter_mut().find(|(n, _)| *n == name) {
+                    Some((_, v)) => *v = value.to_string(),
+                    None => self.parameters.push((name, value.to_string())),
+                }
+            }
+            None => self.parameters.retain(|(n, _)| *n != name),
+        }
+
+        Ok(())
+    }
+
+    /// The charset parameter, `"US-ASCII"` if not present.
     pub fn charset(&self) -> &str {
-        if let Some(c) = &self.charset {
-            c
-        } else {
-            DEFAULT_CHARSET
-        }
+        self.charset_no_default().unwrap_or(DEFAULT_CHARSET)
     }
 
-    pub fn charset_no_default(&self) -> Option<String> {
-        if let Some(c) = &self.charset {
-            Some(c.to_string())
-        } else {
-            None
-        }
+    /// The charset parameter, `None` if not present.
+    pub fn charset_no_default(&self) -> Option<&str> {
+        self.parameter("charset")
     }
 
-    pub fn set_charset(&mut self, new_charset: Option<String>) -> bool {
-        if let Some(nc) = new_charset {
-            // Validate the input
-            if let Some(e) = Encoding::for_label_no_replacement(nc.as_bytes()) {
-                self.charset = Some(e.name().to_string());
-                true
-            } else {
-                // Since browsers fall back to US-ASCII, so does this
-                self.charset = None;
-                false
+    /// Sets the charset parameter, or removes it with `None`.
+    ///
+    /// Any label from the WHATWG Encoding Standard is accepted, and gets stored as the
+    /// encoding's canonical name (e.g. `"utf8"` becomes `"UTF-8"`).
+    /// This only changes the label; use [`set_text`](DataUrl::set_text) to encode text in it.
+    pub fn set_charset(&mut self, charset: Option<&str>) -> Result<(), Error> {
+        match charset {
+            Some(label) => {
+                let encoding = Encoding::for_label_no_replacement(label.trim().as_bytes())
+                    .ok_or(Error::InvalidCharset)?;
+                self.set_parameter("charset", Some(encoding.name()))
             }
-        } else {
-            // Unset
-            self.charset = None;
-            true
+            None => self.set_parameter("charset", None),
         }
     }
 
-    // TODO: ditch get/set_is_base64_encode and implement two separate functions, to_precent_encoded_string, and to_base64_encoded_string?
-    // TODO: ^ if taken that path, should was_input_base64_encoded() added, None by default, Option<bool> after parse() is used, added?
+    /// The encoding used for decoding and encoding text, based on the charset parameter.
+    /// Missing or unknown charsets result in windows-1252, which is what `US-ASCII` maps to.
+    pub fn encoding(&self) -> &'static Encoding {
+        self.charset_no_default()
+            .and_then(|label| Encoding::for_label(label.as_bytes()))
+            .unwrap_or(WINDOWS_1252)
+    }
 
+    /// Whether the data gets serialized as base64 (and whether it was, when parsed).
     pub fn is_base64_encoded(&self) -> bool {
         self.is_base64_encoded
     }
 
-    pub fn set_is_base64_encoded(&mut self, new_is_base64_encoded: bool) {
-        self.is_base64_encoded = new_is_base64_encoded;
+    /// Sets whether the data gets serialized as base64 or percent-encoded.
+    pub fn set_is_base64_encoded(&mut self, is_base64_encoded: bool) {
+        self.is_base64_encoded = is_base64_encoded;
     }
 
+    /// The raw data.
     pub fn data(&self) -> &[u8] {
         &self.data
     }
 
-    pub fn text(&self) -> String {
-        // This can never really fail
-        if let Some(encoding) = Encoding::for_label_no_replacement(
-            self.charset
-                .as_ref()
-                .unwrap_or(&DEFAULT_CHARSET.to_string())
-                .as_bytes(),
-        ) {
-            let (decoded, _, _) = encoding.decode(&self.data);
-            decoded.to_string()
+    /// Consumes the data URL and returns its raw data.
+    pub fn into_data(self) -> Vec<u8> {
+        self.data
+    }
+
+    /// Sets the raw data, which will be serialized byte-for-byte.
+    pub fn set_data(&mut self, data: &[u8]) {
+        self.data = data.to_vec();
+    }
+
+    /// The data decoded as text using [`encoding`](DataUrl::encoding).
+    /// A byte order mark, if present, takes precedence over the charset.
+    pub fn text(&self) -> Cow<'_, str> {
+        self.encoding().decode(&self.data).0
+    }
+
+    /// Sets the data to the given text, encoded using [`encoding`](DataUrl::encoding).
+    ///
+    /// Fails if the text contains characters that can't be represented in that encoding
+    /// (e.g. emoji in windows-1252, the default); set the charset to UTF-8 to store anything.
+    pub fn set_text(&mut self, text: &str) -> Result<(), Error> {
+        let encoding = self.encoding();
+
+        self.data = if encoding == UTF_16LE {
+            text.encode_utf16().flat_map(u16::to_le_bytes).collect()
+        } else if encoding == UTF_16BE {
+            text.encode_utf16().flat_map(u16::to_be_bytes).collect()
+        } else if encoding == REPLACEMENT {
+            return Err(Error::UnencodableText);
         } else {
-            "".to_string()
+            let (encoded, _, had_unmappable_characters) = encoding.encode(text);
+            if had_unmappable_characters {
+                return Err(Error::UnencodableText);
+            }
+            encoded.into_owned()
+        };
+
+        Ok(())
+    }
+
+    /// The fragment (the part after `#`), `None` if absent.
+    pub fn fragment(&self) -> Option<&str> {
+        self.fragment.as_deref()
+    }
+
+    /// Sets the fragment, or removes it with `None`.
+    pub fn set_fragment(&mut self, fragment: Option<&str>) {
+        self.fragment = fragment.map(str::to_string);
+    }
+}
+
+impl fmt::Display for DataUrl {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let mut output = String::from("data:");
+
+        if let Some(media_type) = &self.media_type {
+            output.push_str(media_type);
+        }
+        mime::serialize_parameters(&mut output, &self.parameters);
+
+        if self.is_base64_encoded {
+            output.push_str(";base64,");
+            base64::encode_into(&mut output, &self.data);
+        } else {
+            output.push(',');
+            percent::encode_into(&mut output, &self.data, percent::in_data_set);
+        }
+
+        if let Some(fragment) = &self.fragment {
+            output.push('#');
+            percent::encode_into(&mut output, fragment.as_bytes(), percent::in_fragment_set);
+        }
+
+        f.write_str(&output)
+    }
+}
+
+impl FromStr for DataUrl {
+    type Err = Error;
+
+    fn from_str(input: &str) -> Result<DataUrl, Error> {
+        DataUrl::parse(input)
+    }
+}
+
+impl TryFrom<&str> for DataUrl {
+    type Error = Error;
+
+    fn try_from(input: &str) -> Result<DataUrl, Error> {
+        DataUrl::parse(input)
+    }
+}
+
+/// If the metadata ends with ";base64" (optionally with spaces after the semicolon),
+/// returns the metadata without it.
+fn strip_base64_marker(mime_type: &str) -> Option<&str> {
+    let split_at = mime_type.len().checked_sub(6)?;
+    if !mime_type.is_char_boundary(split_at) {
+        return None;
+    }
+    let (head, tail) = mime_type.split_at(split_at);
+
+    if !tail.eq_ignore_ascii_case("base64") {
+        return None;
+    }
+
+    head.trim_end_matches(' ').strip_suffix(';')
+}
+
+/// Normalizes the part of a data URL that comes after "data:" when it starts with "/",
+/// which makes it a hierarchical URL (with an optional authority) instead of an opaque one.
+/// Returns what URL serializers would produce for it, minus the scheme and fragment.
+fn normalize_hierarchical_part(input: &str) -> Result<String, Error> {
+    let mut output = String::with_capacity(input.len());
+    let mut rest = input;
+
+    if let Some(after_slashes) = input.strip_prefix("//") {
+        let authority_end = after_slashes
+            .find(['/', '?'])
+            .unwrap_or(after_slashes.len());
+        let authority = &after_slashes[..authority_end];
+        rest = &after_slashes[authority_end..];
+
+        let (userinfo, host_and_port) = match authority.rsplit_once('@') {
+            Some((userinfo, host_and_port)) => (Some(userinfo), host_and_port),
+            None => (None, authority),
+        };
+
+        let (host, port) = match host_and_port.strip_prefix('[') {
+            // IPv6 address
+            Some(after_bracket) => {
+                let end = after_bracket.find(']').ok_or(Error::InvalidUrl)?;
+                let address = &after_bracket[..end];
+                if address.is_empty()
+                    || !address
+                        .chars()
+                        .all(|c| c.is_ascii_hexdigit() || c == ':' || c == '.')
+                {
+                    return Err(Error::InvalidUrl);
+                }
+                let after = &after_bracket[end + 1..];
+                let port = match after.strip_prefix(':') {
+                    Some(port) => port,
+                    None if after.is_empty() => "",
+                    None => return Err(Error::InvalidUrl),
+                };
+                (&host_and_port[..end + 2], port)
+            }
+            None => {
+                let (host, port) = host_and_port.split_once(':').unwrap_or((host_and_port, ""));
+                if host.contains(['\0', ' ', '<', '>', '@', '[', '\\', ']', '^', '|']) {
+                    return Err(Error::InvalidUrl);
+                }
+                (host, port)
+            }
+        };
+
+        let port_is_valid = port.is_empty()
+            || (port.bytes().all(|b| b.is_ascii_digit()) && port.parse::<u16>().is_ok());
+        if !port_is_valid || (host.is_empty() && (userinfo.is_some() || !port.is_empty())) {
+            return Err(Error::InvalidUrl);
+        }
+
+        output.push_str("//");
+        if let Some(userinfo) = userinfo.filter(|u| !u.is_empty()) {
+            output.push_str(userinfo);
+            output.push('@');
+        }
+        output.push_str(host);
+        if !port.is_empty() {
+            output.push(':');
+            output.push_str(port);
         }
     }
 
-    /*
-        // TODO: add new_text_charset argument?
-        pub fn set_text(&mut self, new_text: &str) {
-            if self.charset == Some("UTF-8".to_string()) {
-                self.data = new_text.as_bytes().to_vec();
+    // Resolve "." and ".." path segments
+    let (path, query) = rest.split_at(rest.find('?').unwrap_or(rest.len()));
+    if let Some(path) = path.strip_prefix('/') {
+        let is_single_dot = |s: &str| s == "." || s.eq_ignore_ascii_case("%2e");
+        let is_double_dot = |s: &str| {
+            matches!(
+                s.to_ascii_lowercase().as_str(),
+                ".." | ".%2e" | "%2e." | "%2e%2e"
+            )
+        };
+
+        let segments: Vec<&str> = path.split('/').collect();
+        let mut resolved: Vec<&str> = Vec::with_capacity(segments.len());
+        for (i, segment) in segments.iter().enumerate() {
+            let is_last = i == segments.len() - 1;
+            if is_double_dot(segment) {
+                resolved.pop();
+                if is_last {
+                    resolved.push("");
+                }
+            } else if is_single_dot(segment) {
+                if is_last {
+                    resolved.push("");
+                }
             } else {
-                if let Some(encoding) = Encoding::for_label_no_replacement(
-                    self.charset
-                        .as_ref()
-                        .unwrap_or(&DEFAULT_CHARSET.to_string())
-                        .as_bytes(),
-                ) {
-                    let (decoded, _, _) = encoding.decode(&new_text.as_bytes());
-                    self.data = decoded.as_bytes().to_vec();
-                }
-            }
-        }
-    */
-
-    pub fn set_data(&mut self, new_data: &[u8]) {
-        self.data = new_data.to_vec();
-    }
-
-    pub fn fragment(&self) -> Option<String> {
-        if let Some(f) = &self.fragment {
-            Some(f.to_string())
-        } else {
-            None
-        }
-    }
-
-    pub fn set_fragment(&mut self, new_fragment: Option<String>) {
-        self.fragment = new_fragment;
-    }
-
-    // TODO: rename it to as_str/to_str, make it return a &str instead of String
-    // TODO: make it an Option(Result?), throw error in case is_base64_encoded=false, and charset!=default|utf8
-    pub fn to_string(&self) -> String {
-        let mut result: String = String::from("data:");
-
-        if let Some(mt) = &self.media_type {
-            result += &mt;
-        }
-
-        if let Some(c) = &self.charset {
-            // windows-1252 is another name for US-ASCII, the default charset for data URLs
-            if c != "windows-1252" {
-                result += ";charset=";
-                result += &c;
+                resolved.push(segment);
             }
         }
 
-        {
-            if self.is_base64_encoded {
-                result += ";base64";
-            }
-            result += ",";
-
-            if self.data.len() > 0 {
-                if self.is_binary() {
-                    // Just encode as base64 or URI if data is binary
-                    if self.is_base64_encoded {
-                        result += &URL_SAFE.encode(&self.data);
-                    } else {
-                        result += &percent_encode(&self.data, NON_ALPHANUMERIC).to_string();
-                    }
-                } else {
-                    // Charset only matters for textual data
-                    let data_as_utf8_string: String =
-                        String::from_utf8_lossy(&self.data).to_string();
-                    let fallback_charset: String = if data_as_utf8_string.is_ascii() {
-                        DEFAULT_CHARSET.to_string()
-                    } else {
-                        "UTF-8".to_string()
-                    };
-
-                    if let Some(encoding) = Encoding::for_label_no_replacement(
-                        self.charset
-                            .as_ref()
-                            .unwrap_or(&fallback_charset)
-                            .as_bytes(),
-                    ) {
-                        let (encoded, _, _) = encoding.encode(&data_as_utf8_string);
-
-                        if self.is_base64_encoded {
-                            result += &URL_SAFE.encode(&encoded.to_vec());
-                        } else {
-                            result +=
-                                &percent_encode(&encoded.to_vec(), NON_ALPHANUMERIC).to_string();
-                        }
-                    }
-                }
-            }
+        for segment in resolved {
+            output.push('/');
+            output.push_str(segment);
         }
-
-        if let Some(f) = &self.fragment {
-            result += "#";
-            // TODO: need to deal with encoding here as well
-            result += &utf8_percent_encode(f, NON_ALPHANUMERIC).to_string();
-        }
-
-        result
     }
+    output.push_str(query);
+
+    Ok(output)
 }
