@@ -41,7 +41,7 @@ mod detect;
 pub mod mime;
 mod percent;
 
-pub use detect::detect_media_type;
+pub use detect::{detect_media_type, extension_for_media_type};
 pub use mime::MimeType;
 
 use encoding_rs::{Encoding, REPLACEMENT, UTF_16BE, UTF_16LE, WINDOWS_1252};

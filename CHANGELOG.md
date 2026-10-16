@@ -12,6 +12,13 @@
    double-quoted HTML attributes or CSS strings; this keeps text formats like SVG short and readable
  - `DataUrl::write_to()`, which writes a data URL to any `std::io::Write` without building it as a string first
  - `DataUrl::encoded_len()`, the exact length of the serialized data URL, e.g. for preallocating buffers
+ - `extension_for_media_type()`, the counterpart of `detect_media_type()`, which suggests a file extension
+   for a media type (e.g. `svg` for `image/svg+xml`)
+ - CLI options:
+   - `-s`/`--shortest` and `-m`/`--minimal`, for `DataEncoding::Shortest` and `Escaping::Minimal`
+   - `-i` can be given several times, which outputs one data URL per line
+   - `--size` prints the lengths of the percent-encoded and base64-encoded data URLs instead of the data URL
+   - `-O`/`--output-dir` decodes into files named after the input files, with extensions matching their media types
 
 ### Changed
 
