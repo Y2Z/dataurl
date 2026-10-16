@@ -1,4 +1,4 @@
-use dataurl::{DataUrl, Error};
+use dataurl::{DataEncoding, DataUrl, Error, Escaping};
 
 const LIZARD_PNG: &[u8] = include_bytes!("_data_/lizard.png");
 
@@ -10,10 +10,13 @@ mod parse {
         let data_url = DataUrl::parse("data:,")?;
         assert_eq!(data_url.media_type(), "text/plain");
         assert_eq!(data_url.media_type_no_default(), None);
-        assert_eq!(data_url.mime_type(), "text/plain;charset=US-ASCII");
+        assert_eq!(
+            data_url.mime_type().to_string(),
+            "text/plain;charset=US-ASCII"
+        );
         assert_eq!(data_url.charset(), "US-ASCII");
         assert_eq!(data_url.charset_no_default(), None);
-        assert!(!data_url.is_base64_encoded());
+        assert_eq!(data_url.data_encoding(), DataEncoding::Percent);
         assert_eq!(data_url.data(), b"");
         assert_eq!(data_url.fragment(), None);
         Ok(())
@@ -24,7 +27,7 @@ mod parse {
         // The standard base64 alphabet uses "+" and "/" (0.1.x expected "-" and "_" instead)
         let data_url = DataUrl::parse("data:application/octet-stream;base64,+/8=")?;
         assert_eq!(data_url.data(), [0xFB, 0xFF]);
-        assert!(data_url.is_base64_encoded());
+        assert_eq!(data_url.data_encoding(), DataEncoding::Base64);
         Ok(())
     }
 
@@ -55,7 +58,7 @@ mod parse {
     fn charset_after_whitespace() -> Result<(), Error> {
         let data_url = DataUrl::parse("data:text/html; charset=utf-8,x")?;
         assert_eq!(data_url.charset(), "utf-8");
-        assert_eq!(data_url.mime_type(), "text/html;charset=utf-8");
+        assert_eq!(data_url.mime_type().to_string(), "text/html;charset=utf-8");
         Ok(())
     }
 
@@ -160,7 +163,7 @@ mod serialize {
     fn empty() {
         let mut data_url = DataUrl::new();
         assert_eq!(data_url.to_string(), "data:,");
-        data_url.set_is_base64_encoded(true);
+        data_url.set_data_encoding(DataEncoding::Base64);
         assert_eq!(data_url.to_string(), "data:;base64,");
     }
 
@@ -178,7 +181,7 @@ mod serialize {
     fn base64_uses_standard_alphabet() {
         let mut data_url = DataUrl::new();
         data_url.set_media_type(Some("image/png")).unwrap();
-        data_url.set_is_base64_encoded(true);
+        data_url.set_data_encoding(DataEncoding::Base64);
         data_url.set_data(&[0xFB, 0xFF]);
         assert_eq!(data_url.to_string(), "data:image/png;base64,+/8=");
     }
@@ -198,7 +201,7 @@ mod serialize {
         let mut data_url = DataUrl::new();
         data_url.set_charset(Some("utf8")).unwrap();
         assert_eq!(data_url.to_string(), "data:;charset=UTF-8,");
-        assert_eq!(data_url.mime_type(), "text/plain;charset=UTF-8");
+        assert_eq!(data_url.mime_type().to_string(), "text/plain;charset=UTF-8");
     }
 
     #[test]
@@ -227,15 +230,22 @@ mod serialize {
 
     #[test]
     fn round_trips_binary_file() -> Result<(), Error> {
-        for base64 in [true, false] {
-            let mut data_url = DataUrl::new();
-            data_url.set_media_type(Some("image/png"))?;
-            data_url.set_is_base64_encoded(base64);
-            data_url.set_data(LIZARD_PNG);
+        for data_encoding in [
+            DataEncoding::Percent,
+            DataEncoding::Base64,
+            DataEncoding::Shortest,
+        ] {
+            for escaping in [Escaping::Full, Escaping::Minimal] {
+                let mut data_url = DataUrl::new();
+                data_url.set_media_type(Some("image/png"))?;
+                data_url.set_data_encoding(data_encoding);
+                data_url.set_escaping(escaping);
+                data_url.set_data(LIZARD_PNG);
 
-            let parsed = DataUrl::parse(&data_url.to_string())?;
-            assert_eq!(parsed, data_url);
-            assert_eq!(parsed.into_data(), LIZARD_PNG);
+                let parsed = DataUrl::parse(&data_url.to_string())?;
+                assert_eq!(parsed.media_type(), "image/png");
+                assert_eq!(parsed.into_data(), LIZARD_PNG);
+            }
         }
         Ok(())
     }
@@ -274,7 +284,7 @@ mod setters {
         let mut data_url = DataUrl::new();
         data_url.set_charset(Some("utf-8")).unwrap();
         data_url.set_media_type(Some("text/html")).unwrap();
-        assert_eq!(data_url.mime_type(), "text/html;charset=UTF-8");
+        assert_eq!(data_url.mime_type().to_string(), "text/html;charset=UTF-8");
     }
 
     #[test]

@@ -1,11 +1,107 @@
 //! MIME type parsing and serialization, as defined by the WHATWG MIME Sniffing
 //! Standard (<https://mimesniff.spec.whatwg.org/#parsing-a-mime-type>).
+//!
+//! This is the parser used for data URLs, but it works for any MIME type,
+//! such as the value of a `Content-Type` header:
+//!
+//! ```
+//! use dataurl::mime::MimeType;
+//!
+//! let mime_type: MimeType = "Text/HTML; charset=\"Shift_JIS\"; foo=bar".parse()?;
+//! assert_eq!(mime_type.essence(), "text/html");
+//! assert_eq!(mime_type.main_type(), "text");
+//! assert_eq!(mime_type.subtype(), "html");
+//! assert_eq!(mime_type.charset(), Some("Shift_JIS"));
+//! assert_eq!(mime_type.to_string(), "text/html;charset=Shift_JIS;foo=bar");
+//! # Ok::<(), dataurl::Error>(())
+//! ```
+
+use std::fmt;
+use std::str::FromStr;
+
+use crate::Error;
 
 pub(crate) type Parameters = Vec<(String, String)>;
 
-pub(crate) struct MimeType {
-    pub essence: String, // Lowercased "type/subtype"
-    pub parameters: Parameters,
+/// A parsed MIME type: its essence (`type/subtype`, lowercase) and its parameters.
+///
+/// Parameter names are lowercase, and only the first occurrence of each is kept,
+/// the way browsers do it. Parameters that aren't valid are dropped rather than
+/// making the whole MIME type invalid.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct MimeType {
+    pub(crate) essence: String,
+    pub(crate) parameters: Parameters,
+}
+
+impl MimeType {
+    /// Parses a MIME type, failing if its `type/subtype` part isn't valid.
+    pub fn parse(input: &str) -> Result<MimeType, Error> {
+        parse(input).ok_or(Error::InvalidMediaType)
+    }
+
+    /// The `type/subtype` part, lowercase (e.g. `"image/svg+xml"`).
+    pub fn essence(&self) -> &str {
+        &self.essence
+    }
+
+    /// The part before the slash (e.g. `"image"`).
+    pub fn main_type(&self) -> &str {
+        self.essence
+            .split_once('/')
+            .map_or("", |(main_type, _)| main_type)
+    }
+
+    /// The part after the slash (e.g. `"svg+xml"`).
+    pub fn subtype(&self) -> &str {
+        self.essence
+            .split_once('/')
+            .map_or("", |(_, subtype)| subtype)
+    }
+
+    /// Iterates over parameters as `(name, value)` pairs, in order.
+    pub fn parameters(&self) -> impl Iterator<Item = (&str, &str)> {
+        self.parameters
+            .iter()
+            .map(|(n, v)| (n.as_str(), v.as_str()))
+    }
+
+    /// Returns the value of a parameter (names are case-insensitive).
+    pub fn parameter(&self, name: &str) -> Option<&str> {
+        self.parameters
+            .iter()
+            .find(|(n, _)| n.eq_ignore_ascii_case(name))
+            .map(|(_, v)| v.as_str())
+    }
+
+    /// The charset parameter, if present.
+    pub fn charset(&self) -> Option<&str> {
+        self.parameter("charset")
+    }
+}
+
+impl fmt::Display for MimeType {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let mut output = self.essence.clone();
+        serialize_parameters(&mut output, &self.parameters);
+        f.write_str(&output)
+    }
+}
+
+impl FromStr for MimeType {
+    type Err = Error;
+
+    fn from_str(input: &str) -> Result<MimeType, Error> {
+        MimeType::parse(input)
+    }
+}
+
+impl TryFrom<&str> for MimeType {
+    type Error = Error;
+
+    fn try_from(input: &str) -> Result<MimeType, Error> {
+        MimeType::parse(input)
+    }
 }
 
 pub(crate) fn is_http_whitespace(c: char) -> bool {

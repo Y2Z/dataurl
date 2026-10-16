@@ -1,4 +1,4 @@
-use dataurl::{detect_media_type, DataUrl};
+use dataurl::{detect_media_type, DataEncoding, DataUrl};
 use std::ffi::OsString;
 use std::fs;
 use std::io::{self, IsTerminal, Read, Write};
@@ -201,7 +201,9 @@ fn main() {
     } else {
         let mut data_url = DataUrl::new();
 
-        data_url.set_is_base64_encoded(options.base64);
+        if options.base64 {
+            data_url.set_data_encoding(DataEncoding::Base64);
+        }
 
         if let Some(media_type) = &options.media_type {
             data_url

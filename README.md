@@ -53,20 +53,20 @@ cat file.png | dataurl -b
 
 ```toml
 [dependencies]
-dataurl = { version = "0.2", default-features = false }
+dataurl = { version = "0.3", default-features = false }
 ```
 
 ```rust
-use dataurl::DataUrl;
+use dataurl::{DataEncoding, DataUrl};
 
 let data_url: DataUrl = "data:,Hello,%20World!".parse()?;
 
 assert_eq!(data_url.media_type(), "text/plain");
 assert_eq!(data_url.media_type_no_default(), None);
-assert_eq!(data_url.mime_type(), "text/plain;charset=US-ASCII");
+assert_eq!(data_url.mime_type().to_string(), "text/plain;charset=US-ASCII");
 assert_eq!(data_url.charset(), "US-ASCII");
 assert_eq!(data_url.charset_no_default(), None);
-assert!(!data_url.is_base64_encoded());
+assert_eq!(data_url.data_encoding(), DataEncoding::Percent);
 assert_eq!(data_url.data(), b"Hello, World!");
 assert_eq!(data_url.fragment(), None);
 assert_eq!(data_url.text(), "Hello, World!");
@@ -74,13 +74,53 @@ assert_eq!(data_url.to_string(), "data:,Hello,%20World!");
 
 let mut data_url = DataUrl::new();
 data_url.set_media_type(Some("image/png"))?;
-data_url.set_is_base64_encoded(true);
+data_url.set_data_encoding(DataEncoding::Base64);
 data_url.set_data(&[0x89, 0x50, 0x4E, 0x47]);
 assert_eq!(data_url.to_string(), "data:image/png;base64,iVBORw==");
 ```
 
 Data is stored as raw bytes and serialized as-is; use `set_text()` to store text encoded in the data URL's charset, and `text()` to decode it.
 Disabling default features skips the `cli` feature, which only matters for `cargo install`.
+
+### Choosing how data gets encoded
+
+`set_data_encoding()` picks percent-encoding (the default), base64, or `DataEncoding::Shortest`, whichever comes out shorter for the data.
+`set_escaping()` controls how much percent-encoding escapes: `Escaping::Full` (the default) makes the data URL safe anywhere,
+while `Escaping::Minimal` only escapes what has to be, which keeps text formats like SVG short and readable,
+for data URLs that go inside double-quoted HTML attributes or CSS strings:
+
+```rust
+use dataurl::{DataEncoding, DataUrl, Escaping};
+
+let mut data_url = DataUrl::new();
+data_url.set_media_type(Some("image/svg+xml"))?;
+data_url.set_data_encoding(DataEncoding::Shortest);
+data_url.set_escaping(Escaping::Minimal);
+data_url.set_data(b"<svg xmlns='http://www.w3.org/2000/svg'><circle r='4'/></svg>");
+
+assert_eq!(
+    data_url.to_string(),
+    "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'%3E%3Ccircle r='4'/%3E%3C/svg%3E"
+);
+```
+
+### MIME types
+
+The WHATWG MIME type parser used for data URLs is available on its own, e.g. for `Content-Type` headers:
+
+```rust
+use dataurl::{DataUrl, MimeType};
+
+let mime_type: MimeType = "Text/CSS; charset=\"UTF-8\"".parse()?;
+assert_eq!(mime_type.essence(), "text/css");
+assert_eq!(mime_type.charset(), Some("UTF-8"));
+
+let mut data_url = DataUrl::new();
+data_url.set_mime_type(Some(&mime_type))?;
+assert_eq!(data_url.to_string(), "data:text/css;charset=UTF-8,");
+```
+
+### Media type detection
 
 Media types can be detected from the data's signature, falling back to the file extension
 (which is what text formats like CSS and JavaScript need):
@@ -93,7 +133,7 @@ assert_eq!(detect_media_type(b"body{}", Some("style.css")), Some("text/css"));
 ```
 
 If all you need is parsing, [data-url](https://crates.io/crates/data-url) (from the Servo project) is another spec-compliant option;
-dataurl also generates data URLs, and comes with a CLI tool.
+dataurl also generates data URLs (picking the shortest encoding if asked to), handles charsets, detects media types, and comes with a CLI tool.
 
 
 ---------------------------------------------------
