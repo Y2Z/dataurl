@@ -8,7 +8,7 @@ build:
 .PHONY: build
 
 test: build
-	@cargo test --locked
+	@cargo test --locked --all-features
 	@cargo fmt --all -- --check
 .PHONY: test
 

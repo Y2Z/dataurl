@@ -39,6 +39,9 @@
 //! decoding text in other charsets, and detecting media types
 //! (see the [comparison](https://github.com/Y2Z/dataurl#comparison-with-data-url)).
 //!
+//! With the `serde` feature, [`DataUrl`] and [`MimeType`] implement `Serialize` and `Deserialize`,
+//! as strings.
+//!
 //! [data: URL processor]: https://fetch.spec.whatwg.org/#data-url-processor
 //! [data-url]: https://crates.io/crates/data-url
 
@@ -46,6 +49,8 @@ mod base64;
 mod detect;
 pub mod mime;
 mod percent;
+#[cfg(feature = "serde")]
+mod serde_impl;
 
 pub use detect::{detect_media_type, extension_for_media_type};
 pub use mime::MimeType;

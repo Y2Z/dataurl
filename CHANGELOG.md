@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+ - `serde` feature (off by default), which implements `Serialize` and `Deserialize` for `DataUrl` and `MimeType`,
+   as strings; invalid data URLs and MIME types make deserializing fail
+
 ## 0.3.0
 
 ### Added
