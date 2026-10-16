@@ -21,18 +21,36 @@ fn trailing_spaces_start(data: &[u8]) -> usize {
     data.len() - data.iter().rev().take_while(|&&b| b == b' ').count()
 }
 
-/// Percent-encodes the data portion of a data URL.
-pub(crate) fn encode_data_into(output: &mut String, data: &[u8], should_encode: fn(u8) -> bool) {
+/// Percent-encodes the data portion of a data URL, writing it out in chunks,
+/// so that large data doesn't need one big intermediate string.
+pub(crate) fn write_data<W: std::fmt::Write>(
+    writer: &mut W,
+    data: &[u8],
+    should_encode: fn(u8) -> bool,
+) -> std::fmt::Result {
+    const CHUNK_SIZE: usize = 8 * 1024;
     let trailing_spaces_start = trailing_spaces_start(data);
-    output.reserve(data.len());
+    let mut buffer = String::with_capacity(CHUNK_SIZE + 3);
 
     for (i, &byte) in data.iter().enumerate() {
         if should_encode(byte) || i >= trailing_spaces_start {
-            push_encoded(output, byte);
+            push_encoded(&mut buffer, byte);
         } else {
-            output.push(byte as char);
+            buffer.push(byte as char);
+        }
+        if buffer.len() >= CHUNK_SIZE {
+            writer.write_str(&buffer)?;
+            buffer.clear();
         }
     }
+
+    writer.write_str(&buffer)
+}
+
+/// Percent-encodes the data portion of a data URL.
+#[cfg(test)]
+pub(crate) fn encode_data_into(output: &mut String, data: &[u8], should_encode: fn(u8) -> bool) {
+    write_data(output, data, should_encode).unwrap();
 }
 
 /// How long the data portion would be once percent-encoded, without encoding it.
@@ -114,6 +132,22 @@ mod tests {
         encode_data_into(&mut s, b"a b  ", in_minimal_data_set);
         assert_eq!(s, "a b%20%20");
         assert_eq!(encoded_length(b"a b  ", in_minimal_data_set), s.len());
+    }
+
+    #[test]
+    fn chunk_boundaries_do_not_affect_output() {
+        // Trailing spaces spanning a chunk boundary, and escapes landing right on it
+        for length in [8 * 1024 - 1, 8 * 1024, 8 * 1024 + 1, 3 * 8 * 1024 + 5] {
+            for filler in *b"a% " {
+                let mut data = vec![filler; length];
+                data.extend_from_slice(b"x   ");
+                let mut s = String::new();
+                encode_data_into(&mut s, &data, in_minimal_data_set);
+                assert_eq!(s.len(), encoded_length(&data, in_minimal_data_set));
+                assert_eq!(decode(s.as_bytes()), data);
+                assert!(s.ends_with("x%20%20%20"));
+            }
+        }
     }
 
     #[test]

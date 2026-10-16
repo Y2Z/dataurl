@@ -141,12 +141,21 @@ fn parse_args(args: impl Iterator<Item = OsString>) -> Options {
     options
 }
 
-fn write_output(output_file: &Option<OsString>, data: &[u8]) {
+fn write_output(
+    output_file: &Option<OsString>,
+    write: impl FnOnce(&mut dyn Write) -> io::Result<()>,
+) {
     let result = match output_file {
-        Some(path) => fs::write(path, data).map_err(|e| (e, path.to_string_lossy())),
+        Some(path) => fs::File::create(path)
+            .and_then(|file| {
+                let mut writer = io::BufWriter::new(file);
+                write(&mut writer)?;
+                writer.flush()
+            })
+            .map_err(|e| (e, path.to_string_lossy())),
         None => {
             let mut stdout = io::stdout().lock();
-            match stdout.write_all(data).and_then(|_| stdout.flush()) {
+            match write(&mut stdout).and_then(|_| stdout.flush()) {
                 // Being piped into something like `head` is not an error
                 Err(e) if e.kind() == io::ErrorKind::BrokenPipe => Ok(()),
                 result => result.map_err(|e| (e, "STDOUT".into())),
@@ -194,9 +203,11 @@ fn main() {
         if options.output_file.is_none() && io::stdout().is_terminal() && !data_url.is_binary() {
             // Text printed into a terminal gets converted from the data URL's charset
             // TODO: check the terminal's encoding instead of assuming it's UTF-8
-            write_output(&None, data_url.text().as_bytes());
+            write_output(&None, |writer| writer.write_all(data_url.text().as_bytes()));
         } else {
-            write_output(&options.output_file, data_url.data());
+            write_output(&options.output_file, |writer| {
+                writer.write_all(data_url.data())
+            });
         }
     } else {
         let mut data_url = DataUrl::new();
@@ -236,7 +247,7 @@ fn main() {
                         ))
                     }),
                     // Files and STDIN are taken as-is
-                    None => data_url.set_data(&input),
+                    None => data_url.set_data(input),
                 }
             }
             (None, Some(text)) => {
@@ -245,13 +256,16 @@ fn main() {
                     data_url.set_charset(Some("UTF-8")).unwrap();
                 }
             }
-            (None, None) => data_url.set_data(&input),
+            (None, None) => data_url.set_data(input),
         }
 
         if let Some(fragment) = &options.fragment {
             data_url.set_fragment(Some(fragment));
         }
 
-        write_output(&options.output_file, format!("{data_url}\n").as_bytes());
+        write_output(&options.output_file, |writer| {
+            data_url.write_to(&mut *writer)?;
+            writer.write_all(b"\n")
+        });
     }
 }

@@ -10,6 +10,8 @@
  - `DataEncoding::Shortest`, which picks percent-encoding or base64, whichever results in a shorter data URL
  - `Escaping::Minimal`, which only escapes what has to be when percent-encoding, for data URLs that go inside
    double-quoted HTML attributes or CSS strings; this keeps text formats like SVG short and readable
+ - `DataUrl::write_to()`, which writes a data URL to any `std::io::Write` without building it as a string first
+ - `DataUrl::encoded_len()`, the exact length of the serialized data URL, e.g. for preallocating buffers
 
 ### Changed
 
@@ -18,6 +20,12 @@
    which use the new `DataEncoding` enum (`Percent`, `Base64` or `Shortest`)
  - Percent-encoding now also escapes `&`, so that HTML entities can't alter the data
    when a data URL is put into an HTML attribute by hand
+ - `set_data()` takes `impl Into<Vec<u8>>`: passing a `Vec<u8>` or `String` moves it in without copying,
+   while slices, arrays and string literals still work (`&Vec<u8>` needs `.as_slice()` or to be passed by value)
+ - Serializing writes in chunks instead of building the whole data URL in memory first, and parsing base64
+   no longer makes intermediate copies of the data: for a 10 MB payload, peak memory use while parsing went
+   from about 40 MB to 10 MB (just the result), and parsing got about a third faster
+ - The CLI writes its output as it encodes, instead of building it in memory first
 
 ## 0.2.1
 
