@@ -182,7 +182,7 @@ mod serialize {
         let mut data_url = DataUrl::new();
         data_url.set_media_type(Some("image/png")).unwrap();
         data_url.set_data_encoding(DataEncoding::Base64);
-        data_url.set_data(&[0xFB, 0xFF]);
+        data_url.set_data([0xFB, 0xFF]);
         assert_eq!(data_url.to_string(), "data:image/png;base64,+/8=");
     }
 

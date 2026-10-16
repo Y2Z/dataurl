@@ -2,6 +2,26 @@
 
 const ALPHABET: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
+/// Writes base64 in chunks, so that large data doesn't need one big intermediate string.
+pub(crate) fn write<W: std::fmt::Write>(writer: &mut W, data: &[u8]) -> std::fmt::Result {
+    // A multiple of 3, so that only the very last chunk can need padding
+    const CHUNK_SIZE: usize = 6 * 1024;
+    let mut buffer = String::with_capacity(CHUNK_SIZE / 3 * 4);
+
+    for chunk in data.chunks(CHUNK_SIZE) {
+        buffer.clear();
+        encode_into(&mut buffer, chunk);
+        writer.write_str(&buffer)?;
+    }
+
+    Ok(())
+}
+
+/// Length of the base64 encoding of `length` bytes, padding included.
+pub(crate) fn encoded_length(length: usize) -> usize {
+    length.div_ceil(3) * 4
+}
+
 pub(crate) fn encode_into(output: &mut String, data: &[u8]) {
     output.reserve(data.len().div_ceil(3) * 4);
 
@@ -40,29 +60,30 @@ fn decode_char(c: u8) -> Option<u32> {
 /// (<https://infra.spec.whatwg.org/#forgiving-base64-decode>): ASCII whitespace is ignored,
 /// padding is optional, and anything else outside the alphabet makes decoding fail.
 pub(crate) fn decode_forgiving(input: &[u8]) -> Option<Vec<u8>> {
-    let mut data: Vec<u8> = input
-        .iter()
-        .copied()
-        .filter(|c| !matches!(c, b'\t' | b'\n' | 0x0C | b'\r' | b' '))
-        .collect();
+    let is_not_whitespace = |c: &&u8| !matches!(c, b'\t' | b'\n' | 0x0C | b'\r' | b' ');
 
-    if data.len() % 4 == 0 {
-        if data.ends_with(b"==") {
-            data.truncate(data.len() - 2);
-        } else if data.ends_with(b"=") {
-            data.truncate(data.len() - 1);
+    // Work out the length without whitespace and padding first, instead of making a stripped copy
+    let mut length = input.iter().filter(is_not_whitespace).count();
+    if length % 4 == 0 {
+        let mut from_the_end = input.iter().rev().filter(is_not_whitespace);
+        if from_the_end.next() == Some(&b'=') {
+            length -= 1;
+            if from_the_end.next() == Some(&b'=') {
+                length -= 1;
+            }
         }
     }
 
-    if data.len() % 4 == 1 {
+    if length % 4 == 1 {
         return None;
     }
 
-    let mut output: Vec<u8> = Vec::with_capacity(data.len() / 4 * 3 + 2);
+    let mut output: Vec<u8> = Vec::with_capacity(length / 4 * 3 + 2);
     let mut buffer: u32 = 0;
     let mut bits: u8 = 0;
 
-    for c in data {
+    // The padding that was accounted for comes last, so stopping after `length` characters skips it
+    for &c in input.iter().filter(is_not_whitespace).take(length) {
         buffer = buffer << 6 | decode_char(c)?;
         bits += 6;
         if bits == 24 {
@@ -114,6 +135,17 @@ mod tests {
         let mut s = String::new();
         encode_into(&mut s, &data);
         assert_eq!(decode_forgiving(s.as_bytes()).unwrap(), data);
+    }
+
+    #[test]
+    fn chunked_writer_matches_one_go_encoding() {
+        let data: Vec<u8> = (0..=255).cycle().take(6 * 1024 * 3 + 7).collect();
+        let mut chunked = String::new();
+        write(&mut chunked, &data).unwrap();
+        let mut whole = String::new();
+        encode_into(&mut whole, &data);
+        assert_eq!(chunked, whole);
+        assert_eq!(chunked.len(), encoded_length(data.len()));
     }
 
     #[test]

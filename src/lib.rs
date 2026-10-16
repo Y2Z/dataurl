@@ -18,7 +18,7 @@
 //! let mut data_url = DataUrl::new();
 //! data_url.set_media_type(Some("image/png"))?;
 //! data_url.set_data_encoding(DataEncoding::Base64);
-//! data_url.set_data(&[0x89, 0x50, 0x4E, 0x47]);
+//! data_url.set_data([0x89, 0x50, 0x4E, 0x47]);
 //! assert_eq!(data_url.to_string(), "data:image/png;base64,iVBORw==");
 //!
 //! // For text, percent-encoding with minimal escaping is often much shorter than base64
@@ -47,6 +47,7 @@ pub use mime::MimeType;
 use encoding_rs::{Encoding, REPLACEMENT, UTF_16BE, UTF_16LE, WINDOWS_1252};
 use std::borrow::Cow;
 use std::fmt;
+use std::io;
 use std::str::FromStr;
 
 const DEFAULT_MEDIA_TYPE: &str = "text/plain";
@@ -212,15 +213,21 @@ impl DataUrl {
         );
         let mut mime_type: &str = mime_type.trim_matches(|c: char| c.is_ascii_whitespace());
 
-        let mut data: Vec<u8> = percent::decode(encoded_data.as_bytes());
+        // Base64 rarely contains percent-encoded characters, in which case decoding it can be done in one go
+        let percent_decoded: Cow<[u8]> = if encoded_data.contains('%') {
+            Cow::Owned(percent::decode(encoded_data.as_bytes()))
+        } else {
+            Cow::Borrowed(encoded_data.as_bytes())
+        };
 
-        let data_encoding = match strip_base64_marker(mime_type) {
+        let (data, data_encoding) = match strip_base64_marker(mime_type) {
             Some(stripped) => {
-                data = base64::decode_forgiving(&data).ok_or(Error::InvalidBase64)?;
                 mime_type = stripped;
-                DataEncoding::Base64
+                let data =
+                    base64::decode_forgiving(&percent_decoded).ok_or(Error::InvalidBase64)?;
+                (data, DataEncoding::Base64)
             }
-            None => DataEncoding::Percent,
+            None => (percent_decoded.into_owned(), DataEncoding::Percent),
         };
 
         let (media_type, parameters) = if mime_type.starts_with(';') {
@@ -440,8 +447,11 @@ impl DataUrl {
     }
 
     /// Sets the raw data, which will be serialized byte-for-byte.
-    pub fn set_data(&mut self, data: &[u8]) {
-        self.data = data.to_vec();
+    ///
+    /// Passing a `Vec<u8>` (or a `String`) moves it into the data URL without copying;
+    /// slices, arrays and string literals get copied.
+    pub fn set_data(&mut self, data: impl Into<Vec<u8>>) {
+        self.data = data.into();
     }
 
     /// The data decoded as text using [`encoding`](DataUrl::encoding).
@@ -474,6 +484,116 @@ impl DataUrl {
         Ok(())
     }
 
+    /// The exact length of the serialized data URL, without serializing it,
+    /// e.g. for preallocating a buffer. Serialized data URLs are always ASCII,
+    /// so this is both the number of bytes and of characters.
+    pub fn encoded_len(&self) -> usize {
+        let should_encode = self.percent_encoding_set();
+        let data_length = if self.uses_base64(should_encode) {
+            ";base64,".len() + base64::encoded_length(self.data.len())
+        } else {
+            ",".len() + percent::encoded_length(&self.data, should_encode)
+        };
+
+        self.metadata().len() + data_length + self.encoded_fragment().map_or(0, |f| 1 + f.len())
+    }
+
+    /// Writes the data URL to `writer` without building it as one string first,
+    /// which saves memory for large data (`to_string()` and `format!` work too).
+    ///
+    /// ```
+    /// let mut data_url = dataurl::DataUrl::new();
+    /// data_url.set_data("Hello!");
+    ///
+    /// let mut output: Vec<u8> = Vec::new();
+    /// data_url.write_to(&mut output)?;
+    /// assert_eq!(output, b"data:,Hello!");
+    /// # Ok::<(), std::io::Error>(())
+    /// ```
+    pub fn write_to<W: io::Write>(&self, writer: W) -> io::Result<()> {
+        // Adapts io::Write to fmt::Write, keeping the actual I/O error
+        struct Adapter<W> {
+            inner: W,
+            error: Option<io::Error>,
+        }
+
+        impl<W: io::Write> fmt::Write for Adapter<W> {
+            fn write_str(&mut self, s: &str) -> fmt::Result {
+                self.inner.write_all(s.as_bytes()).map_err(|e| {
+                    self.error = Some(e);
+                    fmt::Error
+                })
+            }
+        }
+
+        let mut adapter = Adapter {
+            inner: writer,
+            error: None,
+        };
+        self.write_into(&mut adapter).map_err(|_| {
+            adapter
+                .error
+                .take()
+                .unwrap_or_else(|| io::Error::other("unable to write data URL"))
+        })
+    }
+
+    fn write_into<W: fmt::Write>(&self, writer: &mut W) -> fmt::Result {
+        writer.write_str(&self.metadata())?;
+
+        let should_encode = self.percent_encoding_set();
+        if self.uses_base64(should_encode) {
+            writer.write_str(";base64,")?;
+            base64::write(writer, &self.data)?;
+        } else {
+            writer.write_char(',')?;
+            percent::write_data(writer, &self.data, should_encode)?;
+        }
+
+        if let Some(fragment) = self.encoded_fragment() {
+            writer.write_char('#')?;
+            writer.write_str(&fragment)?;
+        }
+
+        Ok(())
+    }
+
+    /// "data:" followed by the media type and its parameters
+    fn metadata(&self) -> String {
+        let mut output = String::from("data:");
+        if let Some(media_type) = &self.media_type {
+            output.push_str(media_type);
+        }
+        mime::serialize_parameters(&mut output, &self.parameters);
+        output
+    }
+
+    fn percent_encoding_set(&self) -> fn(u8) -> bool {
+        match self.escaping {
+            Escaping::Full => percent::in_data_set,
+            Escaping::Minimal => percent::in_minimal_data_set,
+        }
+    }
+
+    fn uses_base64(&self, should_encode: fn(u8) -> bool) -> bool {
+        match self.data_encoding {
+            DataEncoding::Percent => false,
+            DataEncoding::Base64 => true,
+            DataEncoding::Shortest => {
+                let base64_length = ";base64".len() + base64::encoded_length(self.data.len());
+                base64_length < percent::encoded_length(&self.data, should_encode)
+            }
+        }
+    }
+
+    fn encoded_fragment(&self) -> Option<String> {
+        self.fragment.as_ref().map(|fragment| {
+            let mut output = String::with_capacity(fragment.len());
+            percent::encode_into(&mut output, fragment.as_bytes(), percent::in_fragment_set);
+            output
+        })
+    }
+
     /// The fragment (the part after `#`), `None` if absent.
     pub fn fragment(&self) -> Option<&str> {
         self.fragment.as_deref()
@@ -487,41 +607,7 @@ impl DataUrl {
 
 impl fmt::Display for DataUrl {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let mut output = String::from("data:");
-
-        if let Some(media_type) = &self.media_type {
-            output.push_str(media_type);
-        }
-        mime::serialize_parameters(&mut output, &self.parameters);
-
-        let should_encode: fn(u8) -> bool = match self.escaping {
-            Escaping::Full => percent::in_data_set,
-            Escaping::Minimal => percent::in_minimal_data_set,
-        };
-        let use_base64 = match self.data_encoding {
-            DataEncoding::Percent => false,
-            DataEncoding::Base64 => true,
-            DataEncoding::Shortest => {
-                // ";base64" plus 4 characters for every 3 bytes, versus 1 or 3 characters per byte
-                let base64_length = 7 + self.data.len().div_ceil(3) * 4;
-                base64_length < percent::encoded_length(&self.data, should_encode)
-            }
-        };
-
-        if use_base64 {
-            output.push_str(";base64,");
-            base64::encode_into(&mut output, &self.data);
-        } else {
-            output.push(',');
-            percent::encode_data_into(&mut output, &self.data, should_encode);
-        }
-
-        if let Some(fragment) = &self.fragment {
-            output.push('#');
-            percent::encode_into(&mut output, fragment.as_bytes(), percent::in_fragment_set);
-        }
-
-        f.write_str(&output)
+        self.write_into(f)
     }
 }
 

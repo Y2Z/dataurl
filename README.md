@@ -75,7 +75,7 @@ assert_eq!(data_url.to_string(), "data:,Hello,%20World!");
 let mut data_url = DataUrl::new();
 data_url.set_media_type(Some("image/png"))?;
 data_url.set_data_encoding(DataEncoding::Base64);
-data_url.set_data(&[0x89, 0x50, 0x4E, 0x47]);
+data_url.set_data([0x89, 0x50, 0x4E, 0x47]);
 assert_eq!(data_url.to_string(), "data:image/png;base64,iVBORw==");
 ```
 
