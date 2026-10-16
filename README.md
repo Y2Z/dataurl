@@ -7,7 +7,7 @@
 CLI tool / Rust crate for converting files and text into data URLs and back
 
 Parsing follows the [WHATWG Fetch Standard](https://fetch.spec.whatwg.org/#data-url-processor), which is what browsers implement, and is checked against the [Web Platform Tests](https://github.com/web-platform-tests/wpt) suites for data URLs, base64, and MIME types.
-The only dependency is [encoding_rs](https://crates.io/crates/encoding_rs), used for charsets.
+Dependencies are kept minimal: [encoding_rs](https://crates.io/crates/encoding_rs) for charsets, and [infer](https://crates.io/crates/infer) for detecting media types (both have no dependencies of their own here).
 
 
 ---------------------------------------------------
@@ -24,7 +24,7 @@ dataurl -d 'data:text/html,text<a id%3D"b">ok</a>?a=v#f' > index.html
 ```
 
 ```console
-dataurl -b -t image/png -i picture.png
+dataurl -b -i picture.png
 ```
 
 ```console
@@ -32,7 +32,7 @@ cat file.txt | dataurl -i - -o - | dataurl -d
 ```
 
 ```console
-cat file.png | dataurl -b -t image/png
+cat file.png | dataurl -b
 ```
 
 ### Flags and options
@@ -43,7 +43,7 @@ cat file.png | dataurl -b -t image/png
  - `-f`: Append `fragment`
  - `-i`: Specify `file` to read data from (use `-` for STDIN)
  - `-o`: Provide `file` to write output to (use `-` for STDOUT)
- - `-t`: Adjust `media type`
+ - `-t`: Adjust `media type` (detected automatically for files and STDIN)
 
 
 ---------------------------------------------------
@@ -81,6 +81,16 @@ assert_eq!(data_url.to_string(), "data:image/png;base64,iVBORw==");
 
 Data is stored as raw bytes and serialized as-is; use `set_text()` to store text encoded in the data URL's charset, and `text()` to decode it.
 Disabling default features skips the `cli` feature, which only matters for `cargo install`.
+
+Media types can be detected from the data's signature, falling back to the file extension
+(which is what text formats like CSS and JavaScript need):
+
+```rust
+use dataurl::detect_media_type;
+
+assert_eq!(detect_media_type(b"\x89PNG\r\n\x1a\n", None), Some("image/png"));
+assert_eq!(detect_media_type(b"body{}", Some("style.css")), Some("text/css"));
+```
 
 If all you need is parsing, [data-url](https://crates.io/crates/data-url) (from the Servo project) is another spec-compliant option;
 dataurl also generates data URLs, and comes with a CLI tool.

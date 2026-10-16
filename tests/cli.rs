@@ -207,6 +207,49 @@ mod encode {
         assert!(output.status.success());
         let data_url = dataurl::DataUrl::parse(&String::from_utf8(output.stdout).unwrap()).unwrap();
         assert_eq!(data_url.data(), contents);
+        assert_eq!(data_url.media_type_no_default(), Some("text/plain"));
+    }
+
+    #[test]
+    fn media_type_detected_for_input_file() {
+        let file = data_file("lizard.png");
+        let output = run(&["-b", "-i", file.to_str().unwrap()], b"");
+        assert!(output.status.success());
+        assert!(output.stdout.starts_with(b"data:image/png;base64,iVBOR"));
+    }
+
+    #[test]
+    fn media_type_detected_for_stdin() {
+        let png = std::fs::read(data_file("lizard.png")).unwrap();
+        let output = run(&["-b"], &png);
+        assert!(output.status.success());
+        assert!(output.stdout.starts_with(b"data:image/png;base64,iVBOR"));
+    }
+
+    #[test]
+    fn media_type_option_overrides_detection() {
+        let file = data_file("lizard.png");
+        let output = run(
+            &[
+                "-b",
+                "-t",
+                "application/octet-stream",
+                "-i",
+                file.to_str().unwrap(),
+            ],
+            b"",
+        );
+        assert!(output
+            .stdout
+            .starts_with(b"data:application/octet-stream;base64,iVBOR"));
+    }
+
+    #[test]
+    fn media_type_not_detected_for_argument() {
+        assert_success(
+            &run(&["<html></html>"], b""),
+            b"data:,%3Chtml%3E%3C/html%3E\n",
+        );
     }
 
     #[test]

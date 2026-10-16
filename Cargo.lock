@@ -16,9 +16,10 @@ checksum = "7f8f80099a98041a3d1622845c271458a2d73e688351bf3cb999266764b81d48"
 
 [[package]]
 name = "dataurl"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "encoding_rs",
+ "infer",
 ]
 
 [[package]]
@@ -34,6 +35,12 @@ dependencies = [
  "scopeguard",
  "simdutf8",
 ]
+
+[[package]]
+name = "infer"
+version = "0.22.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f4200d433cbd5178df7797c9c2e75b348b728e39631cf14520d1e2fc424201f4"
 
 [[package]]
 name = "multiversion_no_op"

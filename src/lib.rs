@@ -26,8 +26,11 @@
 //! [data: URL processor]: https://fetch.spec.whatwg.org/#data-url-processor
 
 mod base64;
+mod detect;
 mod mime;
 mod percent;
+
+pub use detect::detect_media_type;
 
 use encoding_rs::{Encoding, REPLACEMENT, UTF_16BE, UTF_16LE, WINDOWS_1252};
 use std::borrow::Cow;
